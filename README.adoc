@@ -1,1 +1,38 @@
 = Make Alpine Linux VM Image
+:script-name: alpine-make-vm-image
+:script-sha1: N/A
+:gh-name: jirutka/{script-name}
+:version: 0.0.0
+
+ifdef::env-github[]
+image:https://travis-ci.org/{gh-name}.svg?branch=master["Build Status", link="https://travis-ci.org/{gh-name}"]
+endif::env-github[]
+
+This project provides script for making customizable Alpine Linux disk image for virtual machines.
+
+
+== Requirements
+
+* Alpine Linux (you can use https://github.com/alpinelinux/alpine-chroot-install[alpine-chroot-install] to easily install Alpine on any Linux system)
+* POSIX-sh compatible shell (e.g. Busybox ash, dash, Bash, ZSH)
+* qemu-img, qemu-nbd, and syslinux (automatically installed by the script)
+* e2fsprogs (for ext4), btrfs-progs (for Btrfs), or xfsprogs (for XFS) (automatically installed by the script)
+
+
+== Usage
+
+Read documentation in link:{script-name}[{script-name}].
+See link:.travis.yml[.travis.yml] for Travis example.
+
+You can copy link:{script-name}[{script-name}] into your repository or download it on demand, e.g.:
+
+[source, sh, subs="+attributes"]
+wget https://raw.githubusercontent.com/{gh-name}/v{version}/{script-name} \
+    && echo '{script-sha1}  {script-name}' | sha1sum -c \
+    || exit 1
+
+
+== License
+
+This project is licensed under http://opensource.org/licenses/MIT/[MIT License].
+For the full text of the license, see the link:LICENSE[LICENSE] file.
