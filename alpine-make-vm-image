@@ -48,6 +48,11 @@
 #
 #   -v --version                          Print version and exit.
 #
+#   APK                                   APK command to use. Default is "apk".
+#
+#   APK_OPTS                              Options to pass into apk on each execution.
+#                                         Default is "--no-progress".
+#
 # Each option can be also provided by environment variable. If both option and
 # variable is specified and the option accepts only one argument, then the
 # option takes precedence.
@@ -56,10 +61,12 @@
 #---help---
 set -eu
 
-readonly APK='apk --no-progress'
 readonly PROGNAME='alpine-make-vm-image'
 readonly VERSION='0.0.0'
 readonly VIRTUAL_PKG=".make-$PROGNAME"
+
+: ${APK:="apk"}
+: ${APK_OPTS:="--no-progress"}
 
 
 die() {
@@ -89,7 +96,11 @@ cleanup() {
 	fi
 	qemu-nbd --disconnect "$nbd_dev" \
 		|| die "Failed to disconnect $nbd_dev; disconnect it manually"
-	$APK del $VIRTUAL_PKG
+	_apk del $VIRTUAL_PKG
+}
+
+_apk() {
+	"$APK" $APK_OPTS "$@"
 }
 
 # Attaches the specified image as a NBD block device and prints its path.
@@ -139,7 +150,7 @@ install_fs_tools() {
 		*) die "Unsupported filesystem: $fs";;
 	esac
 
-	$APK add -t $VIRTUAL_PKG $pkg
+	_apk add -t $VIRTUAL_PKG $pkg
 }
 
 # Prepares chroot at the specified path.
@@ -259,7 +270,7 @@ SCRIPT=
 #-----------------------------------------------------------------------
 einfo 'Installing needed packages on host system'
 
-$APK add -t $VIRTUAL_PKG qemu qemu-img syslinux
+_apk add -t $VIRTUAL_PKG qemu qemu-img syslinux
 install_fs_tools "$ROOTFS"
 
 #-----------------------------------------------------------------------
@@ -298,24 +309,24 @@ mkdir -p etc/apk/keys
 install -m 644 "$REPOS_FILE" etc/apk/repositories
 cp "$KEYS_DIR"/* etc/apk/keys/
 
-$APK add --root . --update-cache --initdb alpine-base
+_apk add --root . --update-cache --initdb alpine-base
 prepare_chroot .
 
 #-----------------------------------------------------------------------
 einfo "Installing and configuring mkinitfs"
 
-$APK add --root . mkinitfs
+_apk add --root . mkinitfs
 setup_mkinitfs . "base $ROOTFS $INITFS_FEATURES"
 
 #-----------------------------------------------------------------------
 einfo "Installing kernel linux-$KERNEL_FLAVOR"
 
-$APK add --root . linux-$KERNEL_FLAVOR
+_apk add --root . linux-$KERNEL_FLAVOR
 
 #-----------------------------------------------------------------------
 einfo 'Setting up extlinux bootloader'
 
-$APK add --root . --no-scripts syslinux
+_apk add --root . --no-scripts syslinux
 setup_extlinux . "UUID=$root_uuid" $ROOTFS ${KERNEL_FLAVOR#virt}
 
 cat > etc/fstab <<-EOF
@@ -333,7 +344,7 @@ rc_add shutdown killprocs savecache mount-ro
 #-----------------------------------------------------------------------
 if [ -n "$PACKAGES" ]; then
 	einfo 'Installing additional packages'
-	$APK add --root . $PACKAGES
+	_apk add --root . $PACKAGES
 fi
 
 #-----------------------------------------------------------------------
