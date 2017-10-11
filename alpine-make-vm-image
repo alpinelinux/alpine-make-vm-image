@@ -109,9 +109,12 @@ attach_image() {
 	local format="${2:-}"
 	local nbd_dev
 
-	modprobe nbd max_part=0 || true
-	nbd_dev=$(get_available_nbd) \
-		|| die "No available nbd device found!"
+	nbd_dev=$(get_available_nbd) || {
+		modprobe nbd max_part=0
+		sleep 1
+		nbd_dev=$(get_available_nbd)
+	} || die 'No available nbd device found!'
+
 	qemu-nbd --connect="$nbd_dev" ${format:+--format=$format} "$image" \
 		&& echo "$nbd_dev"
 }
@@ -124,9 +127,9 @@ blk_uuid() {
 
 # Prints path of available nbdX device, or returns 1 if not any.
 get_available_nbd() {
-	local dev; for dev in /dev/nbd*; do
+	local dev; for dev in $(find /dev -maxdepth 2 -name 'nbd[0-9]*'); do
 		if [ "$(blockdev --getsize64 "$dev")" -eq 0 ]; then
-			echo "$dev"; return
+			echo "$dev"; return 0
 		fi
 	done
 	return 1
