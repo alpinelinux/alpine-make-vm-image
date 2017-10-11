@@ -15,7 +15,7 @@ This project provides script for making customizable Alpine Linux disk image for
 
 * Alpine Linux (you can use https://github.com/alpinelinux/alpine-chroot-install[alpine-chroot-install] to easily install Alpine on any Linux system)
 * POSIX-sh compatible shell (e.g. Busybox ash, dash, Bash, ZSH)
-* qemu-img, qemu-nbd, and syslinux (automatically installed by the script)
+* qemu-img and qemu-nbd (automatically installed by the script)
 * e2fsprogs (for ext4), btrfs-progs (for Btrfs), or xfsprogs (for XFS) (automatically installed by the script)
 
 

@@ -6,8 +6,8 @@
 # This script creates a bootable Alpine Linux disk image for virtual machines.
 # If running on Alpine system (detected by file /etc/alpine-release), then it
 # also installs needed packages on the host system. On other systems you must
-# install them yourself: qemu-img, qemu-nbd, syslinux, and mkfs utility for the
-# chosen ROOTFS.
+# install them yourself: qemu-img, qemu-nbd, and mkfs utility for the chosen
+# ROOTFS.
 #
 # Note that it does not create any partitions (it's really not needed),
 # filesystem is created directly on the image.
@@ -203,7 +203,7 @@ setup_extlinux() {
 		-e "s|^[# ]*(default)=.*|\1=$default_kernel|" \
 		"$mnt"/etc/update-extlinux.conf
 
-	extlinux --install "$mnt"/boot
+	chroot "$mnt" extlinux --install /boot
 	chroot "$mnt" update-extlinux --warn-only 2>&1 \
 		| grep -Fv 'extlinux: cannot open device /dev' >&2
 }
@@ -288,7 +288,7 @@ SCRIPT=
 if [ "$INSTALL_HOST_PKGS" = yes ]; then
 	einfo 'Installing needed packages on host system'
 
-	_apk add -t $VIRTUAL_PKG qemu qemu-img syslinux
+	_apk add -t $VIRTUAL_PKG qemu qemu-img
 	install_fs_tools "$ROOTFS"
 fi
 
