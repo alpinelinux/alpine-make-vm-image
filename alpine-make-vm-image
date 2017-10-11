@@ -287,8 +287,10 @@ nbd_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
 #-----------------------------------------------------------------------
 einfo "Formatting image to $ROOTFS"
 
-# syslinux 6.0.3 cannot boot from ext4 w/ 64bit feature enabled
-[ "$ROOTFS" = ext4 ] && mkfs_args='-O ^64bit' || mkfs_args=''
+# syslinux 6.0.3 cannot boot from ext4 w/ 64bit feature enabled.
+# -E nodiscard / -K - do not attempt to discard blocks at mkfs time (it's
+# useless for NBD image and prints confusing error).
+[ "$ROOTFS" = ext4 ] && mkfs_args='-O ^64bit -E nodiscard' || mkfs_args='-K'
 
 mkfs.$ROOTFS -L root $mkfs_args "$nbd_dev"
 
