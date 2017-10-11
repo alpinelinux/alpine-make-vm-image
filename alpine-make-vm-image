@@ -4,6 +4,11 @@
 # Usage: alpine-make-vm-image [options] [--] <image> [<script> [<script-opts...>]]
 #
 # This script creates a bootable Alpine Linux disk image for virtual machines.
+# If running on Alpine system (detected by file /etc/alpine-release), then it
+# also installs needed packages on the host system. On other systems you must
+# install them yourself: qemu-img, qemu-nbd, syslinux, and mkfs utility for the
+# chosen ROOTFS.
+#
 # Note that it does not create any partitions (it's really not needed),
 # filesystem is created directly on the image.
 #
@@ -96,7 +101,10 @@ cleanup() {
 	fi
 	qemu-nbd --disconnect "$nbd_dev" \
 		|| die "Failed to disconnect $nbd_dev; disconnect it manually"
-	_apk del $VIRTUAL_PKG
+
+	if [ "$INSTALL_HOST_PKGS" = yes ]; then
+		_apk del $VIRTUAL_PKG
+	fi
 }
 
 _apk() {
@@ -262,6 +270,12 @@ done
 : ${ROOTFS:="ext4"}
 : ${SCRIPT_CHROOT:="no"}
 
+if [ -f /etc/alpine-release ]; then
+	: ${INSTALL_HOST_PKGS:="yes"}
+else
+	: ${INSTALL_HOST_PKGS:="no"}
+fi
+
 [ $# -ne 0 ] || help 1 >&2
 
 IMAGE_FILE="$1"; shift
@@ -271,10 +285,12 @@ SCRIPT=
 [ "$CLEANUP" = no ] || trap cleanup EXIT HUP INT TERM
 
 #-----------------------------------------------------------------------
-einfo 'Installing needed packages on host system'
+if [ "$INSTALL_HOST_PKGS" = yes ]; then
+	einfo 'Installing needed packages on host system'
 
-_apk add -t $VIRTUAL_PKG qemu qemu-img syslinux
-install_fs_tools "$ROOTFS"
+	_apk add -t $VIRTUAL_PKG qemu qemu-img syslinux
+	install_fs_tools "$ROOTFS"
+fi
 
 #-----------------------------------------------------------------------
 if [ ! -f "$IMAGE_FILE" ]; then
