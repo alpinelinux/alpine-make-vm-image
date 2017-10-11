@@ -84,6 +84,11 @@ readonly VIRTUAL_PKG=".make-$PROGNAME"
 : ${APK_OPTS:="--no-progress"}
 
 
+# For compatibility with systems that does not have "realpath" command.
+if ! command -v realpath 2>/dev/null; then
+	alias realpath='readlink -f'
+fi
+
 die() {
 	printf '\033[1;31mERROR:\033[0m %s\n' "$@" >&2  # bold red
 	exit 1
