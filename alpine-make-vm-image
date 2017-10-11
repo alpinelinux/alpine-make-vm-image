@@ -117,9 +117,10 @@ cleanup() {
 			|| die "Failed to unmount $mount_dir; unmount it and disconnect $nbd_dev manually"
 		rm -Rf "$mount_dir" || :
 	fi
-	qemu-nbd --disconnect "$nbd_dev" \
-		|| die "Failed to disconnect $nbd_dev; disconnect it manually"
-
+	if [ -n "$nbd_dev" ]; then
+		qemu-nbd --disconnect "$nbd_dev" \
+			|| die "Failed to disconnect $nbd_dev; disconnect it manually"
+	fi
 	if [ "$INSTALL_HOST_PKGS" = yes ]; then
 		_apk del $VIRTUAL_PKG
 	fi
