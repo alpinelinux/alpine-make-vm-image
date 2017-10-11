@@ -199,7 +199,7 @@ prepare_chroot() {
 # root of the image.
 rc_add() {
 	local runlevel="$1"; shift  # runlevel name
-	local services="$@"  # names of services
+	local services="$*"  # names of services
 
 	local svc; for svc in $services; do
 		mkdir -p etc/runlevels/$runlevel
@@ -413,10 +413,10 @@ if [ -n "$SCRIPT" ]; then
 	script_name="${SCRIPT##*/}"
 
 	if [ "$SCRIPT_CHROOT" = 'no' ]; then
-		einfo "Executing script: $script_name $@"
+		einfo "Executing script: $script_name $*"
 		"$SCRIPT" "$@" || die 'Script failed'
 	else
-		einfo "Executing script in chroot: $script_name $@"
+		einfo "Executing script in chroot: $script_name $*"
 		mount --bind "${SCRIPT%/*}" mnt/
 		chroot . sh -c "cd /mnt && ./$script_name \"\$@\"" -- "$@" \
 			|| die 'Script failed'
