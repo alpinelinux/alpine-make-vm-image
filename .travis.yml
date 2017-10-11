@@ -1,18 +1,18 @@
 dist: trusty
 sudo: required
 language: minimal
-before_install:
-  - "wget 'https://raw.githubusercontent.com/alpinelinux/alpine-chroot-install/v0.6.0/alpine-chroot-install' \
-        && echo 'a827a4ba3d0817e7c88bae17fe34e50204983d1e  alpine-chroot-install' | sha1sum -c || exit 1"
-install:
-  - sudo sh alpine-chroot-install -b v3.6
+addons:
+  apt:
+    packages:
+      - qemu-utils
 before_script:
   - sudo modprobe nbd
 script:
-  - /alpine/enter-chroot ./alpine-make-vm-image
+  - sudo ./alpine-make-vm-image
         --image-format qcow2
         --image-size 2G
         --repositories-file example/repositories
+        --keys-dir example/keys
         --packages "$(cat example/packages)"
         --script-chroot
         alpine-virthardened-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh
