@@ -8,7 +8,8 @@ ifdef::env-github[]
 image:https://travis-ci.org/{gh-name}.svg?branch=master["Build Status", link="https://travis-ci.org/{gh-name}"]
 endif::env-github[]
 
-This project provides script for making customizable https://alpinelinux.org/[Alpine Linux] disk image for virtual machines.
+This project provides script for making customized https://alpinelinux.org/[Alpine Linux] disk images for virtual machines.
+It’s quite simple (250 LoC of shell), fast (~40 seconds on Travis CI including Travis VM initialization) and requires minimum dependencies (QEMU and filesystem tools).
 
 
 == Requirements
