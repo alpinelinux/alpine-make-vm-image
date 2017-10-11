@@ -5,8 +5,6 @@ addons:
   apt:
     packages:
       - qemu-utils
-before_script:
-  - sudo modprobe nbd
 script:
   - sudo ./alpine-make-vm-image
         --image-format qcow2
