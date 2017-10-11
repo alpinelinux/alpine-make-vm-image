@@ -112,12 +112,12 @@ cleanup() {
 	if [ -d "$temp_dir" ]; then
 		rm -Rf "$temp_dir" || :
 	fi
-	if [ -n "$mount_dir" ]; then
+	if [ "$mount_dir" ]; then
 		umount_recursively "$mount_dir" \
 			|| die "Failed to unmount $mount_dir; unmount it and disconnect $nbd_dev manually"
 		rm -Rf "$mount_dir" || :
 	fi
-	if [ -n "$nbd_dev" ]; then
+	if [ "$nbd_dev" ]; then
 		qemu-nbd --disconnect "$nbd_dev" \
 			|| die "Failed to disconnect $nbd_dev; disconnect it manually"
 	fi
@@ -403,13 +403,13 @@ rc_add boot modules hwclock swap hostname sysctl bootmisc syslog
 rc_add shutdown killprocs savecache mount-ro
 
 #-----------------------------------------------------------------------
-if [ -n "$PACKAGES" ]; then
+if [ "$PACKAGES" ]; then
 	einfo 'Installing additional packages'
 	_apk add --root . $PACKAGES
 fi
 
 #-----------------------------------------------------------------------
-if [ -n "$SCRIPT" ]; then
+if [ "$SCRIPT" ]; then
 	script_name="${SCRIPT##*/}"
 
 	if [ "$SCRIPT_CHROOT" = 'no' ]; then
