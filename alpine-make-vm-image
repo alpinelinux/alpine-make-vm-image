@@ -105,17 +105,17 @@ help() {
 }
 
 cleanup() {
-	set +u
+	set +eu
 	trap '' EXIT HUP INT TERM  # unset trap to avoid loop
 
 	cd /
 	if [ -d "$temp_dir" ]; then
-		rm -Rf "$temp_dir" || :
+		rm -Rf "$temp_dir"
 	fi
 	if [ "$mount_dir" ]; then
 		umount_recursively "$mount_dir" \
 			|| die "Failed to unmount $mount_dir; unmount it and disconnect $nbd_dev manually"
-		rm -Rf "$mount_dir" || :
+		rm -Rf "$mount_dir"
 	fi
 	if [ "$nbd_dev" ]; then
 		qemu-nbd --disconnect "$nbd_dev" \
