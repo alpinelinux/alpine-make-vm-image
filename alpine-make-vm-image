@@ -7,7 +7,8 @@
 # If running on Alpine system (detected by file /etc/alpine-release), then it
 # also installs needed packages on the host system. On other systems you must
 # install them yourself: qemu-img, qemu-nbd, and mkfs utility for the chosen
-# ROOTFS.
+# ROOTFS. If $APK is not available on the host system, then static apk-tools
+# specified by $APK_TOOLS_URI is downloaded and used.
 #
 # Note that it does not create any partitions (it's really not needed),
 # filesystem is created directly on the image.
@@ -58,6 +59,12 @@
 #   APK_OPTS                              Options to pass into apk on each execution.
 #                                         Default is "--no-progress".
 #
+#   APK_TOOLS_URI                         URL of static apk-tools tarball to download if $APK is
+#                                         not found on the host system. Default is x86_64 apk-tools
+#                                         from https://github.com/alpinelinux/apk-tools/releases.
+#
+#   APK_TOOLS_SHA256                      SHA-256 checksum of $APK_TOOLS_URI.
+#
 # Each option can be also provided by environment variable. If both option and
 # variable is specified and the option accepts only one argument, then the
 # option takes precedence.
@@ -69,6 +76,9 @@ set -eu
 readonly PROGNAME='alpine-make-vm-image'
 readonly VERSION='0.1.0'
 readonly VIRTUAL_PKG=".make-$PROGNAME"
+
+: ${APK_TOOLS_URI:="https://github.com/alpinelinux/apk-tools/releases/download/v2.8.0/apk-tools-2.8.0-x86_64-linux.tar.gz"}
+: ${APK_TOOLS_SHA256:="da21cefd2121e3a6cd4e8742b38118b2a1132aad7f707646ee946a6b32ee6df9"}
 
 : ${APK:="apk"}
 : ${APK_OPTS:="--no-progress"}
@@ -94,6 +104,9 @@ cleanup() {
 	trap '' EXIT HUP INT TERM  # unset trap to avoid loop
 
 	cd /
+	if [ -d "$temp_dir" ]; then
+		rm -Rf "$temp_dir" || :
+	fi
 	if [ -n "$mount_dir" ]; then
 		umount_recursively "$mount_dir" \
 			|| die "Failed to unmount $mount_dir; unmount it and disconnect $nbd_dev manually"
@@ -231,6 +244,16 @@ umount_recursively() {
 		| xargs umount -rn
 }
 
+wgets() (
+	local url="$1"
+	local sha256="$2"
+	local dest="${3:-.}"
+
+	cd "$dest" \
+		&& wget -T 10 --no-verbose "$url" \
+		&& echo "$sha256  ${url##*/}" | sha256sum -c
+)
+
 
 #=============================  M a i n  ==============================#
 
@@ -290,6 +313,17 @@ if [ "$INSTALL_HOST_PKGS" = yes ]; then
 
 	_apk add -t $VIRTUAL_PKG qemu qemu-img
 	install_fs_tools "$ROOTFS"
+fi
+
+#-----------------------------------------------------------------------
+temp_dir=''
+if ! command -v "$APK" >/dev/null; then
+	einfo "$APK not found, downloading static apk-tools"
+
+	temp_dir="$(mktemp -d /tmp/$PROGNAME.XXXXXX)"
+	wgets "$APK_TOOLS_URI" "$APK_TOOLS_SHA256" "$temp_dir"
+	tar -C "$temp_dir" -xzf "$temp_dir/${APK_TOOLS_URI##*/}"
+	APK="$(ls "$temp_dir"/apk-tools-*/apk)"
 fi
 
 #-----------------------------------------------------------------------
