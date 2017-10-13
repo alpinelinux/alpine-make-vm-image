@@ -85,7 +85,7 @@ readonly VIRTUAL_PKG=".make-$PROGNAME"
 
 
 # For compatibility with systems that does not have "realpath" command.
-if ! command -v realpath 2>/dev/null; then
+if ! command -v realpath >/dev/null; then
 	alias realpath='readlink -f'
 fi
 
