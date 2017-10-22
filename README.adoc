@@ -36,6 +36,28 @@ wget https://raw.githubusercontent.com/{gh-name}/v{version}/{script-name} \
     || exit 1
 
 
+== Pitfalls
+
+=== Creating Image for VMware (ESXi)
+
+VMware and disk images (virtual disks) is one big mess.
+You can find that VMware uses format VMDK, but the problem is that this is not a single format.
+Actually it has many subformats with very different structure and various (in)compatibility with VMware hypervisors.
+
+When I created disk image using `qemu-img create -f vmdk` or converted Qcow2 to VMDK using `qemu-img convert -O vmdk`, vSphere client loaded this image without any problem, but data was corrupted.
+Eventually I found in some old documentation that ESXi does not support “sparse” disks…
+
+So after many trials I found out that the least bad and functional solution is to create Qcow2 image and then convert it to VMDK using:
+
+[source, sh]
+qemu-img convert -f qcow2 -O vmdk -o adapter_type=lsilogic,subformat=monolithicFlat alpine.qcow2 alpine.vmdk
+
+Unfortunately this creates a “thick” image, i.e. its size equals the “provisioned space”, not actually used space as in Qcow2.
+However, you can compress it with gzip to avoid transferring multiple gigabytes of zeros over network.
+
+Also note that VMware has some problem with hardened kernel, so you have to boot it with `pax_nouderef` (read more https://wiki.alpinelinux.org/wiki/Install_Alpine_on_VMware[here]).
+
+
 == License
 
 This project is licensed under http://opensource.org/licenses/MIT/[MIT License].
