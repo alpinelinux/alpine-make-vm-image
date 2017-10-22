@@ -69,7 +69,7 @@
 # variable is specified and the option accepts only one argument, then the
 # option takes precedence.
 #
-# https://github.com/jirutka/alpine-make-vm-image
+# https://github.com/alpinelinux/alpine-make-vm-image
 #---help---
 set -eu
 
