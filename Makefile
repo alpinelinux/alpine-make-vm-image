@@ -17,6 +17,11 @@ bump-version:
 	$(SED) -E -i "s/^(readonly VERSION)=.*/\1='$(VERSION)'/" $(SCRIPT_NAME)
 	$(SED) -E -i "s/^(:version:).*/\1 $(VERSION)/" README.adoc
 
+#: Install the script into $DESTDIR.
+install:
+	mkdir -p $(DESTDIR)$(PREFIX)/bin
+	install -m 755 $(SCRIPT_NAME) $(DESTDIR)$(PREFIX)/bin/$(SCRIPT_NAME)
+
 #: Update variable :script-sha1: in README.adoc with SHA1 checksum of the script.
 readme-update-checksum:
 	$(SED) -E -i \
@@ -30,11 +35,6 @@ release: .check-git-clean | bump-version readme-update-checksum
 	git commit -m "Release version $(VERSION)"
 	git tag -s v$(VERSION) -m v$(VERSION)
 
-#: Install script into $DESTDIR.
-install:
-	mkdir -p $(DESTDIR)$(PREFIX)/bin
-	install -m 755 $(SCRIPT_NAME) $(DESTDIR)$(PREFIX)/bin/$(SCRIPT_NAME)
-
 #: Print list of targets.
 help:
 	@printf '%s\n\n' 'List of targets:'
@@ -45,4 +45,4 @@ help:
 	@test -z "$(shell git status --porcelain)" \
 		|| { echo 'You have uncommitted changes!' >&2; exit 1; }
 
-.PHONY: bump-version readme-update-checksum release help .check-git-clean
+.PHONY: bump-version install readme-update-checksum release help .check-git-clean
