@@ -74,7 +74,7 @@
 set -eu
 
 readonly PROGNAME='alpine-make-vm-image'
-readonly VERSION='0.2.1'
+readonly VERSION='0.2.2'
 readonly VIRTUAL_PKG=".make-$PROGNAME"
 
 : ${APK_TOOLS_URI:="https://github.com/alpinelinux/apk-tools/releases/download/v2.9.1/apk-tools-2.9.1-x86_64-linux.tar.gz"}
