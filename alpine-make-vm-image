@@ -409,6 +409,8 @@ EOF
 einfo 'Enabling base system services'
 
 rc_add sysinit devfs dmesg mdev hwdrivers
+[ -e etc/init.d/cgroups ] && rc_add sysinit cgroups ||:  # since v3.8
+
 rc_add boot modules hwclock swap hostname sysctl bootmisc syslog
 rc_add shutdown killprocs savecache mount-ro
 
