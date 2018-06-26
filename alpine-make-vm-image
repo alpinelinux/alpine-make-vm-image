@@ -77,8 +77,8 @@ readonly PROGNAME='alpine-make-vm-image'
 readonly VERSION='0.2.2'
 readonly VIRTUAL_PKG=".make-$PROGNAME"
 
-: ${APK_TOOLS_URI:="https://github.com/alpinelinux/apk-tools/releases/download/v2.9.1/apk-tools-2.9.1-x86_64-linux.tar.gz"}
-: ${APK_TOOLS_SHA256:="a0546d814a85fcc94a6e560360c4f1997119e40d79d9bc818f1571b2cf2ea5e9"}
+: ${APK_TOOLS_URI:="https://github.com/alpinelinux/apk-tools/releases/download/v2.10.0/apk-tools-2.10.0-x86_64-linux.tar.gz"}
+: ${APK_TOOLS_SHA256:="77f2d256fcd5d6fdafadf43bb6a9c85c3da7bb471ee842dcd729175235cb9fed"}
 
 : ${APK:="apk"}
 : ${APK_OPTS:="--no-progress"}
