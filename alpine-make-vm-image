@@ -32,8 +32,9 @@
 #                                         $ROOTFS is always included, don't specify them here.
 #                                         Default is "scsi virtio".
 #
-#   -k --kernel-flavor KERNEL_FLAVOR      The kernel flavour to install; vanilla, hardened,
-#                                         or virthardened. Default is virthardened.
+#   -k --kernel-flavor KERNEL_FLAVOR      The kernel flavour to install; vanilla, virt, hardened,
+#                                         or virthardened (the last two only up to Alpine 3.7).
+#                                         Default is virt (Alpine 3.8+) or virthardened.
 #
 #      --keys-dir KEYS_DIR                Path of directory with Alpine keys to copy into the image.
 #                                         Default is /etc/apk/keys.
@@ -295,7 +296,7 @@ done
 : ${IMAGE_FORMAT:=}
 : ${IMAGE_SIZE:="2G"}
 : ${INITFS_FEATURES:="scsi virtio"}
-: ${KERNEL_FLAVOR:="virthardened"}
+: ${KERNEL_FLAVOR:=}
 : ${KEYS_DIR:="/etc/apk/keys"}
 : ${PACKAGES:=}
 : ${REPOS_FILE:="/etc/apk/repositories"}
@@ -383,6 +384,12 @@ _apk add --root . mkinitfs
 setup_mkinitfs . "base $ROOTFS $INITFS_FEATURES"
 
 #-----------------------------------------------------------------------
+if [ -z "$KERNEL_FLAVOR" ]; then
+	_apk search --root . --exact --quiet linux-virt | grep -q . \
+		&& KERNEL_FLAVOR='virt' \
+		|| KERNEL_FLAVOR='virthardened'
+fi
+
 einfo "Installing kernel linux-$KERNEL_FLAVOR"
 
 _apk add --root . linux-$KERNEL_FLAVOR
