@@ -37,7 +37,8 @@
 #                                         Default is virt (Alpine 3.8+) or virthardened.
 #
 #      --keys-dir KEYS_DIR                Path of directory with Alpine keys to copy into the image.
-#                                         Default is /etc/apk/keys.
+#                                         Default is /etc/apk/keys. If does not exist, keys for
+#                                         x86_64 embedded in this script will be used.
 #
 #   -C --no-cleanup (CLEANUP)             Don't umount and disconnect image when done.
 #
@@ -77,6 +78,12 @@ set -eu
 readonly PROGNAME='alpine-make-vm-image'
 readonly VERSION='0.3.0'
 readonly VIRTUAL_PKG=".make-$PROGNAME"
+
+# Alpine APK keys for verification of packages for x86_64.
+readonly ALPINE_KEYS='
+alpine-devel@lists.alpinelinux.org-4a6a0840.rsa.pub:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1yHJxQgsHQREclQu4Ohe\nqxTxd1tHcNnvnQTu/UrTky8wWvgXT+jpveroeWWnzmsYlDI93eLI2ORakxb3gA2O\nQ0Ry4ws8vhaxLQGC74uQR5+/yYrLuTKydFzuPaS1dK19qJPXB8GMdmFOijnXX4SA\njixuHLe1WW7kZVtjL7nufvpXkWBGjsfrvskdNA/5MfxAeBbqPgaq0QMEfxMAn6/R\nL5kNepi/Vr4S39Xvf2DzWkTLEK8pcnjNkt9/aafhWqFVW7m3HCAII6h/qlQNQKSo\nGuH34Q8GsFG30izUENV9avY7hSLq7nggsvknlNBZtFUcmGoQrtx3FmyYsIC8/R+B\nywIDAQAB
+alpine-devel@lists.alpinelinux.org-5261cecb.rsa.pub:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwlzMkl7b5PBdfMzGdCT0\ncGloRr5xGgVmsdq5EtJvFkFAiN8Ac9MCFy/vAFmS8/7ZaGOXoCDWbYVLTLOO2qtX\nyHRl+7fJVh2N6qrDDFPmdgCi8NaE+3rITWXGrrQ1spJ0B6HIzTDNEjRKnD4xyg4j\ng01FMcJTU6E+V2JBY45CKN9dWr1JDM/nei/Pf0byBJlMp/mSSfjodykmz4Oe13xB\nCa1WTwgFykKYthoLGYrmo+LKIGpMoeEbY1kuUe04UiDe47l6Oggwnl+8XD1MeRWY\nsWgj8sF4dTcSfCMavK4zHRFFQbGp/YFJ/Ww6U9lA3Vq0wyEI6MCMQnoSMFwrbgZw\nwwIDAQAB
+'
 
 : ${APK_TOOLS_URI:="https://github.com/alpinelinux/apk-tools/releases/download/v2.10.0/apk-tools-2.10.0-x86_64-linux.tar.gz"}
 : ${APK_TOOLS_SHA256:="77f2d256fcd5d6fdafadf43bb6a9c85c3da7bb471ee842dcd729175235cb9fed"}
@@ -153,6 +160,21 @@ attach_image() {
 blk_uuid() {
 	local dev="$1"
 	blkid "$dev" | sed -En 's/.*UUID="([^"]+)".*/\1/p'
+}
+
+# Writes Alpine APK keys embedded in this script into directory $1.
+dump_alpine_keys() {
+	local dest_dir="$1"
+	local content file line
+
+	mkdir -p "$dest_dir"
+	for line in $ALPINE_KEYS; do
+		file=${line%%:*}
+		content=${line#*:}
+
+		printf -- "-----BEGIN PUBLIC KEY-----\n$content\n-----END PUBLIC KEY-----\n" \
+			> "$dest_dir/$file"
+	done
 }
 
 # Prints path of available nbdX device, or returns 1 if not any.
@@ -372,7 +394,11 @@ cd "$mount_dir"
 
 mkdir -p etc/apk/keys
 install -m 644 "$REPOS_FILE" etc/apk/repositories
-cp "$KEYS_DIR"/* etc/apk/keys/
+if [ -d "$KEYS_DIR" ]; then
+	cp "$KEYS_DIR"/* etc/apk/keys/
+else
+	dump_alpine_keys etc/apk/keys/
+fi
 
 _apk add --root . --update-cache --initdb alpine-base
 prepare_chroot .

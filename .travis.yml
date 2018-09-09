@@ -10,7 +10,6 @@ script:
         --image-format qcow2
         --image-size 2G
         --repositories-file example/repositories
-        --keys-dir example/keys
         --packages "$(cat example/packages)"
         --script-chroot
         alpine-virthardened-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh
