@@ -85,7 +85,7 @@
 set -eu
 
 readonly PROGNAME='alpine-make-vm-image'
-readonly VERSION='0.3.0'
+readonly VERSION='0.4.0'
 readonly VIRTUAL_PKG=".make-$PROGNAME"
 
 # Alpine APK keys for verification of packages for x86_64.
