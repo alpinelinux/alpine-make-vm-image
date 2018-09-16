@@ -217,14 +217,21 @@ install_fs_tools() {
 	_apk add -t $VIRTUAL_PKG $pkg
 }
 
+# Binds the directory $1 at the mountpoint $2 and sets propagation to private.
+mount_bind() {
+	mkdir -p "$2"
+	mount --bind "$1" "$2"
+	mount --make-private "$2"
+}
+
 # Prepares chroot at the specified path.
 prepare_chroot() {
 	local dest="$1"
 
-	mkdir -p "$dest"/proc "$dest"/dev "$dest"/sys
+	mkdir -p "$dest"/proc
 	mount -t proc none "$dest"/proc
-	mount --bind /dev "$dest"/dev
-	mount --bind /sys "$dest"/sys
+	mount_bind /dev "$dest"/dev
+	mount_bind /sys "$dest"/sys
 
 	install -D -m 644 /etc/resolv.conf "$dest"/etc/resolv.conf
 }
@@ -475,7 +482,7 @@ if [ "$SCRIPT" ]; then
 		"$SCRIPT" "$@" || die 'Script failed'
 	else
 		einfo "Executing script in chroot: $script_name $*"
-		mount --bind "${SCRIPT%/*}" mnt/
+		mount_bind "${SCRIPT%/*}" mnt/
 		chroot . sh -c "cd /mnt && ./$script_name \"\$@\"" -- "$@" \
 			|| die 'Script failed'
 	fi
