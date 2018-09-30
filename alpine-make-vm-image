@@ -61,6 +61,8 @@
 #   -c --script-chroot (SCRIPT_CHROOT)    Bind <script>'s directory at /mnt inside image and chroot
 #                                         into the image before executing <script>.
 #
+#   -t --serial-console                   Add configuration for a serial console on ttyS0
+#
 #   -h --help                             Show this help message and exit.
 #
 #   -v --version                          Print version and exit.
@@ -263,6 +265,12 @@ setup_extlinux() {
 		-e "s|^[# ]*(default)=.*|\1=$default_kernel|" \
 		"$mnt"/etc/update-extlinux.conf
 
+	if [ $SERIAL_CONSOLE = "yes" ]; then
+		sed -Ei -e "s|^[# ]*(serial_port)=.*|\1=ttyS0|" \
+			-e "s|^[# ]*(default_kernel_opts)=.*|\1=\"console=ttyS0\"|" \
+			"$mnt"/etc/update-extlinux.conf
+	fi
+
 	chroot "$mnt" extlinux --install /boot
 	chroot "$mnt" update-extlinux --warn-only 2>&1 \
 		| grep -Fv 'extlinux: cannot open device /dev' >&2
@@ -305,8 +313,8 @@ wgets() (
 
 #=============================  M a i n  ==============================#
 
-opts=$(getopt -n $PROGNAME -o b:cCf:hi:k:p:r:s:v \
-	-l branch:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,repositories-file:,rootfs:,script-chroot,help,version \
+opts=$(getopt -n $PROGNAME -o b:cCf:hi:k:p:r:s:tv \
+	-l branch:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
 	-- "$@") || help 1 >&2
 
 eval set -- "$opts"
@@ -324,6 +332,7 @@ while [ $# -gt 0 ]; do
 		-p | --packages) PACKAGES="${PACKAGES:-} $2";;
 		-r | --repositories-file) REPOS_FILE="$(realpath "$2")";;
 		     --rootfs) ROOTFS="$2";;
+		-t | --serial-console) SERIAL_CONSOLE='yes'; n=1;;
 		-c | --script-chroot) SCRIPT_CHROOT='yes'; n=1;;
 		-h | --help) help 0;;
 		-V | --version) echo "$PROGNAME $VERSION"; exit 0;;
@@ -344,6 +353,7 @@ done
 : ${REPOS_FILE:="/etc/apk/repositories"}
 : ${ROOTFS:="ext4"}
 : ${SCRIPT_CHROOT:="no"}
+: ${SERIAL_CONSOLE:="no"}
 
 if [ -f /etc/alpine-release ]; then
 	: ${INSTALL_HOST_PKGS:="yes"}
@@ -471,6 +481,13 @@ rc_add shutdown killprocs savecache mount-ro
 if [ "$PACKAGES" ]; then
 	einfo 'Installing additional packages'
 	_apk add --root . $PACKAGES
+fi
+
+#-----------------------------------------------------------------------
+if [ $SERIAL_CONSOLE = "yes" ]; then
+	echo ttyS0 >> "$mount_dir/etc/securetty"
+	sed -Ei -e "s|^#(ttyS0:.*)|\1|" \
+		"$mount_dir/etc/inittab"
 fi
 
 #-----------------------------------------------------------------------
