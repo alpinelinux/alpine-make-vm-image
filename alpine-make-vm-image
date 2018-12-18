@@ -84,6 +84,9 @@
 #---help---
 set -eu
 
+# Some distros (e.g. Arch Linux) does not have /bin or /sbin in PATH.
+PATH="$PATH:/usr/sbin:/usr/bin:/sbin:/bin"
+
 readonly PROGNAME='alpine-make-vm-image'
 readonly VERSION='0.4.0'
 readonly VIRTUAL_PKG=".make-$PROGNAME"
