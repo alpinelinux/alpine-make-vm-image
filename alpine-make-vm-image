@@ -263,8 +263,8 @@ setup_extlinux() {
 		-e "s|^[# ]*(default)=.*|\1=$default_kernel|" \
 		"$mnt"/etc/update-extlinux.conf
 
-	chroot "$mnt" extlinux --install /boot
-	chroot "$mnt" update-extlinux --warn-only 2>&1 \
+	chroot "$mnt" /sbin/extlinux --install /boot
+	chroot "$mnt" /sbin/update-extlinux --warn-only 2>&1 \
 		| grep -Fv 'extlinux: cannot open device /dev' >&2
 }
 
