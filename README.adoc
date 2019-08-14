@@ -1,8 +1,8 @@
 = Make Alpine Linux VM Image
 :script-name: alpine-make-vm-image
-:script-sha1: 5fb3270e0d665e51b908e1755b40e9c9156917c0
+:script-sha1: 979de8f0ae8646ae1b6738e039e9dd0555628d60
 :gh-name: alpinelinux/{script-name}
-:version: 0.4.0
+:version: 0.5.0
 
 ifdef::env-github[]
 image:https://travis-ci.org/{gh-name}.svg?branch=master["Build Status", link="https://travis-ci.org/{gh-name}"]
