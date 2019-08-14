@@ -199,25 +199,15 @@ get_available_nbd() {
 	return 1
 }
 
-# Installs tools in the host system needed for creating the specified filesystem.
-install_fs_tools() {
+# Prints name of the package needed for creating the specified filesystem.
+fs_progs_pkg() {
 	local fs="$1"  # filesystem name
 
-	# We need load btrfs module early to avoid the error message:
-	# 'failed to open /dev/btrfs-control'
-	if ! grep -q -w "$fs" /proc/filesystems; then
-		modprobe $fs
-	fi
-
-	local pkg
 	case "$fs" in
-		ext4) pkg='e2fsprogs';;
-		btrfs) pkg='btrfs-progs';;
-		xfs) pkg='xfsprogs';;
-		*) die "Unsupported filesystem: $fs";;
+		ext4) echo 'e2fsprogs';;
+		btrfs) echo 'btrfs-progs';;
+		xfs) echo 'xfsprogs';;
 	esac
-
-	_apk add -t $VIRTUAL_PKG $pkg
 }
 
 # Binds the directory $1 at the mountpoint $2 and sets propagation to private.
@@ -366,8 +356,12 @@ SCRIPT=
 if [ "$INSTALL_HOST_PKGS" = yes ]; then
 	einfo 'Installing needed packages on host system'
 
-	_apk add -t $VIRTUAL_PKG qemu qemu-img
-	install_fs_tools "$ROOTFS"
+	# We need load btrfs module to avoid the error message:
+	# 'failed to open /dev/btrfs-control'
+	if ! grep -q -w "$ROOTFS" /proc/filesystems; then
+		modprobe $ROOTFS
+	fi
+	_apk add -t $VIRTUAL_PKG qemu qemu-img $(fs_progs_pkg "$ROOTFS")
 fi
 
 #-----------------------------------------------------------------------
