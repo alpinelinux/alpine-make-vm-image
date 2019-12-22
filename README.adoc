@@ -9,7 +9,7 @@ image:https://travis-ci.org/{gh-name}.svg?branch=master["Build Status", link="ht
 endif::env-github[]
 
 This project provides a script for making customized https://alpinelinux.org/[Alpine Linux] disk images for virtual machines.
-It’s quite simple (250 LoC of shell), fast (~40 seconds on Travis CI including Travis VM initialization) and requires minimum dependencies (QEMU and filesystem tools).
+It’s quite simple (300 LoC of shell), fast (~22 seconds on Travis CI, without Travis VM initialization) and requires minimum dependencies (QEMU and filesystem tools).
 
 TIP: Don’t need VM, just want to chroot into Alpine Linux (e.g. on CI)?
      Try https://github.com/alpinelinux/alpine-chroot-install[alpine-chroot-install]!
