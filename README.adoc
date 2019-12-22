@@ -55,8 +55,6 @@ qemu-img convert -f qcow2 -O vmdk -o adapter_type=lsilogic,subformat=monolithicF
 Unfortunately, this creates a “thick” image, i.e. its size equals the “provisioned space”, not actually used space as in Qcow2.
 However, you can compress it with gzip to avoid transferring multiple gigabytes of zeros over network.
 
-Also note that VMware has some problem with hardened kernel, so you have to boot it with `pax_nouderef` (read more https://wiki.alpinelinux.org/wiki/Install_Alpine_on_VMware[here]).
-
 
 == License
 
