@@ -244,12 +244,11 @@ rc_add() {
 setup_extlinux() {
 	local mnt="$1"  # path of directory where is root device currently mounted
 	local root_dev="$2"  # root device
-	local modules="${3:-}"  # modules which should be loaded before pivot_root
+	local modules="$3"  # modules which should be loaded before pivot_root
 	local default_kernel="${4:-"vanilla"}"  # name of default kernel to boot
-	local kernel_opts="${5:-}"  # default kernel options
 
 	sed -Ei -e "s|^[# ]*(root)=.*|\1=$root_dev|" \
-		-e "s|^[# ]*(default_kernel_opts)=.*|\1=\"$kernel_opts\"|" \
+		-e "s|^[# ]*(default_kernel_opts)=.*|\1=\"\"|" \
 		-e "s|^[# ]*(modules)=.*|\1=\"$modules\"|" \
 		-e "s|^[# ]*(default)=.*|\1=$default_kernel|" \
 		"$mnt"/etc/update-extlinux.conf
