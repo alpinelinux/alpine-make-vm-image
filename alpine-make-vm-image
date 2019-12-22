@@ -379,7 +379,7 @@ if [ "$INSTALL_HOST_PKGS" = yes ]; then
 	if ! grep -q -w "$ROOTFS" /proc/filesystems; then
 		modprobe $ROOTFS
 	fi
-	_apk add -t $VIRTUAL_PKG qemu qemu-img $(fs_progs_pkg "$ROOTFS")
+	_apk add -t $VIRTUAL_PKG qemu-img $(fs_progs_pkg "$ROOTFS")
 fi
 
 #-----------------------------------------------------------------------
