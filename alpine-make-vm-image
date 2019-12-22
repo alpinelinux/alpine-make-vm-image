@@ -35,7 +35,8 @@
 #                                         $ROOTFS is always included, don't specify them here.
 #                                         Default is "scsi virtio".
 #
-#   -k --kernel-flavor KERNEL_FLAVOR      The kernel flavour to install; virt (default), or vanilla.
+#   -k --kernel-flavor KERNEL_FLAVOR      The kernel flavour to install; virt (default), lts
+#                                         (Alpine >=3.11), or vanilla (Alpine <3.11).
 #
 #      --keys-dir KEYS_DIR                Path of directory with Alpine keys to copy into the image.
 #                                         Default is /etc/apk/keys. If does not exist, keys for
@@ -245,7 +246,14 @@ setup_extlinux() {
 	local mnt="$1"  # path of directory where is root device currently mounted
 	local root_dev="$2"  # root device
 	local modules="$3"  # modules which should be loaded before pivot_root
-	local default_kernel="${4:-"vanilla"}"  # name of default kernel to boot
+	local kernel_flavor="$4"  # name of default kernel to boot
+	local default_kernel="$kernel_flavor"
+
+	if [ "$kernel_flavor" = 'virt' ]; then
+		_apk search --root . --exact --quiet linux-lts | grep -q . \
+			&& default_kernel='lts' \
+			|| default_kernel='vanilla'
+	fi
 
 	sed -Ei -e "s|^[# ]*(root)=.*|\1=$root_dev|" \
 		-e "s|^[# ]*(default_kernel_opts)=.*|\1=\"\"|" \
@@ -439,7 +447,7 @@ _apk add --root . linux-$KERNEL_FLAVOR
 einfo 'Setting up extlinux bootloader'
 
 _apk add --root . --no-scripts syslinux
-setup_extlinux . "UUID=$root_uuid" $ROOTFS ${KERNEL_FLAVOR#virt}
+setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR"
 
 cat > etc/fstab <<-EOF
 	# <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
