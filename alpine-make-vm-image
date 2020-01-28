@@ -498,7 +498,7 @@ if [ "$SCRIPT" ]; then
 	else
 		einfo "Executing script in chroot: $script_name $*"
 		mount_bind "${SCRIPT%/*}" mnt/
-		chroot . sh -c "cd /mnt && ./$script_name \"\$@\"" -- "$@" \
+		chroot . /bin/sh -c "cd /mnt && ./$script_name \"\$@\"" -- "$@" \
 			|| die 'Script failed'
 	fi
 fi
