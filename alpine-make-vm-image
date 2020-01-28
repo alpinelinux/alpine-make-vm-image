@@ -23,7 +23,8 @@
 #
 # Options and Environment Variables:
 #   -b --branch ALPINE_BRANCH             Alpine branch to install; used only when
-#                                         --repositories-file is not specified. Default is v3.11.
+#                                         --repositories-file is not specified. Default is
+#                                         latest-stable.
 #
 #   -f --image-format IMAGE_FORMAT        Format of the disk image (see qemu-img --help).
 #
@@ -339,7 +340,7 @@ while [ $# -gt 0 ]; do
 	shift $n
 done
 
-: ${ALPINE_BRANCH:="v3.11"}
+: ${ALPINE_BRANCH:="latest-stable"}
 : ${ALPINE_MIRROR:="https://nl.alpinelinux.org/alpine"}
 : ${CLEANUP:="yes"}
 : ${IMAGE_FORMAT:=}
