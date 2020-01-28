@@ -354,6 +354,10 @@ done
 : ${SCRIPT_CHROOT:="no"}
 : ${SERIAL_CONSOLE:="no"}
 
+case "$ALPINE_BRANCH" in
+	[0-9]*) ALPINE_BRANCH="v$ALPINE_BRANCH";;
+esac
+
 if [ -f /etc/alpine-release ]; then
 	: ${INSTALL_HOST_PKGS:="yes"}
 else
