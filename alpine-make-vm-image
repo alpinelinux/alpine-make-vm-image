@@ -447,6 +447,11 @@ else
 	dump_alpine_keys etc/apk/keys/
 fi
 
+# use APK cache if available
+if [ -L /etc/apk/cache ]; then
+	ln -s $(realpath /etc/apk/cache) etc/apk/cache
+fi
+
 _apk add --root . --update-cache --initdb alpine-base
 prepare_chroot .
 
