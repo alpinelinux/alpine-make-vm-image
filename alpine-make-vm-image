@@ -516,5 +516,9 @@ fi
 #-----------------------------------------------------------------------
 einfo 'Completed'
 
+if [ -L /etc/apk/cache ]; then
+	rm etc/apk/cache > /dev/null 2>&1
+fi
+
 cd - >/dev/null
 ls -lh "$IMAGE_FILE"
