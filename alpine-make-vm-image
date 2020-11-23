@@ -141,8 +141,7 @@ cleanup() {
 		rm -Rf "$mount_dir"
 	fi
 	if [ "$loopback_dev" ]; then
-		qemu-nbd --disconnect "$loopback_dev" \
-			|| die "Failed to disconnect $loopback_dev; disconnect it manually"
+		losetup -d $loopback_dev
 	fi
 	if [ "$INSTALL_HOST_PKGS" = yes ]; then
 		_apk del $VIRTUAL_PKG
@@ -155,7 +154,7 @@ _apk() {
 
 
 get_available_loopback() {
-	loopdev=$(losetup -f)
+	losetup -f
 }
 
 
@@ -167,7 +166,7 @@ attach_image() {
 
 	loopback_dev=$(get_available_loopback) || die 'No available loopback device found!'
 
-	losetup -fP $image
+	losetup -P $loopback_dev $image
 
 	echo $loopback_dev
 }
