@@ -1,6 +1,6 @@
 # alpine-make-mbr
 
-This is a fork of `alpine-make-vm-image` that can run inside `WSL2`.
+This is a fork of `alpine-make-vm-image` that can run inside `WSL2` and a privileged Docker container.
 As for now it only supports the `-s` option.
 
 ## Why
