@@ -137,12 +137,12 @@ cleanup() {
 	fi
 	if [ "$mount_dir" ]; then
 		umount_recursively "$mount_dir" \
-			|| die "Failed to unmount $mount_dir; unmount it and disconnect $nbd_dev manually"
+			|| die "Failed to unmount $mount_dir; unmount it and disconnect $loopback_dev manually"
 		rm -Rf "$mount_dir"
 	fi
-	if [ "$nbd_dev" ]; then
-		qemu-nbd --disconnect "$nbd_dev" \
-			|| die "Failed to disconnect $nbd_dev; disconnect it manually"
+	if [ "$loopback_dev" ]; then
+		qemu-nbd --disconnect "$loopback_dev" \
+			|| die "Failed to disconnect $loopback_dev; disconnect it manually"
 	fi
 	if [ "$INSTALL_HOST_PKGS" = yes ]; then
 		_apk del $VIRTUAL_PKG
@@ -153,21 +153,23 @@ _apk() {
 	"$APK" $APK_OPTS "$@"
 }
 
-# Attaches the specified image as a NBD block device and prints its path.
+
+get_available_loopback() {
+	loopdev=$(losetup -f)
+}
+
+
+# Attaches the specified image as a loopback device and prints its path.
 attach_image() {
 	local image="$1"
 	local format="${2:-}"
-	local nbd_dev
+	local loopback_dev
 
-	nbd_dev=$(get_available_nbd) || {
-		modprobe nbd max_part=0
-		sleep 1
-		nbd_dev=$(get_available_nbd)
-	} || die 'No available nbd device found!'
+	loopback_dev=$(get_available_loopback) || die 'No available loopback device found!'
 
-	qemu-nbd --connect="$nbd_dev" --cache=writeback \
-		${format:+--format=$format} "$image" \
-		&& echo "$nbd_dev"
+	losetup -fP $image
+
+	echo $loopback_dev
 }
 
 # Prints UUID of filesystem on the specified block device.
@@ -191,15 +193,6 @@ dump_alpine_keys() {
 	done
 }
 
-# Prints path of available nbdX device, or returns 1 if not any.
-get_available_nbd() {
-	local dev; for dev in $(find /dev -maxdepth 2 -name 'nbd[0-9]*'); do
-		if [ "$(blockdev --getsize64 "$dev")" -eq 0 ]; then
-			echo "$dev"; return 0
-		fi
-	done
-	return 1
-}
 
 # Prints name of the package needed for creating the specified filesystem.
 fs_progs_pkg() {
@@ -405,9 +398,9 @@ if [ ! -f "$IMAGE_FILE" ]; then
 fi
 
 #-----------------------------------------------------------------------
-einfo "Attaching image $IMAGE_FILE as a NBD device"
+einfo "Attaching image $IMAGE_FILE as a loopback device"
 
-nbd_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
+loopback_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
 
 #-----------------------------------------------------------------------
 einfo "Formatting image to $ROOTFS"
@@ -417,15 +410,15 @@ einfo "Formatting image to $ROOTFS"
 # useless for NBD image and prints confusing error).
 [ "$ROOTFS" = ext4 ] && mkfs_args='-O ^64bit -E nodiscard' || mkfs_args='-K'
 
-mkfs.$ROOTFS -L root $mkfs_args "$nbd_dev"
+mkfs.$ROOTFS -L root $mkfs_args "$loopback_dev"
 
-root_uuid=$(blk_uuid "$nbd_dev")
+root_uuid=$(blk_uuid "$loopback_dev")
 mount_dir=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 
 #-----------------------------------------------------------------------
 einfo "Mounting image at $mount_dir"
 
-mount "$nbd_dev" "$mount_dir"
+mount "$loopback_dev" "$mount_dir"
 
 #-----------------------------------------------------------------------
 einfo 'Installing base system'
