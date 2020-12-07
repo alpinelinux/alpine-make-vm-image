@@ -90,7 +90,7 @@ set -eu
 PATH="$PATH:/usr/sbin:/usr/bin:/sbin:/bin"
 
 readonly PROGNAME='alpine-make-vm-image'
-readonly VERSION='0.6.0'
+readonly VERSION='0.7.0'
 readonly VIRTUAL_PKG=".make-$PROGNAME"
 
 # Alpine APK keys for verification of packages for x86_64.
