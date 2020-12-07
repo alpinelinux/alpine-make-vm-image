@@ -1,0 +1,24 @@
+name: CI
+on:
+  - push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install qemu-utils
+        run: |
+          sudo apt-get update
+          sudo apt-get install qemu-utils
+
+      - uses: actions/checkout@v2
+
+      - name: Build image
+        run: |
+          sudo ./alpine-make-vm-image \
+              --image-format qcow2 \
+              --image-size 2G \
+              --repositories-file example/repositories \
+              --packages "$(cat example/packages)" \
+              --script-chroot \
+              alpine-virthardened-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh

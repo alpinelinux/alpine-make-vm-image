@@ -5,11 +5,11 @@
 :version: 0.6.0
 
 ifdef::env-github[]
-image:https://travis-ci.org/{gh-name}.svg?branch=master["Build Status", link="https://travis-ci.org/{gh-name}"]
+image:https://github.com/{gh-name}/workflows/CI/badge.svg["Build Status", link="https://github.com/{gh-name}/actions"]
 endif::env-github[]
 
 This project provides a script for making customized https://alpinelinux.org/[Alpine Linux] disk images for virtual machines.
-It’s quite simple (300 LoC of shell), fast (~22 seconds on Travis CI, without Travis VM initialization) and requires minimum dependencies (QEMU and filesystem tools).
+It’s quite simple (300 LoC of shell), fast (~32 seconds on GitHub Actions) and requires minimum dependencies (QEMU and filesystem tools).
 
 TIP: Don’t need VM, just want to chroot into Alpine Linux (e.g. on CI)?
      Try https://github.com/alpinelinux/alpine-chroot-install[alpine-chroot-install]!
@@ -26,7 +26,7 @@ TIP: Don’t need VM, just want to chroot into Alpine Linux (e.g. on CI)?
 == Usage
 
 Read documentation in link:{script-name}[{script-name}].
-See link:.travis.yml[.travis.yml] for Travis example.
+See link:.github/workflows/ci.yml[] for GitHub Actions example.
 
 You can copy link:{script-name}[{script-name}] into your repository or download it on demand, e.g.:
 
