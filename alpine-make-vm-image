@@ -45,7 +45,7 @@
 #
 #   -m --mirror-uri ALPINE_MIRROR         URI of the Aports mirror to fetch packages; used only
 #                                         when --repositories-file is not specified. Default is
-#                                         https://nl.alpinelinux.org/alpine.
+#                                         http://dl-cdn.alpinelinux.org/alpine.
 #
 #   -C --no-cleanup (CLEANUP)             Don't umount and disconnect image when done.
 #
@@ -341,7 +341,7 @@ while [ $# -gt 0 ]; do
 done
 
 : ${ALPINE_BRANCH:="latest-stable"}
-: ${ALPINE_MIRROR:="https://nl.alpinelinux.org/alpine"}
+: ${ALPINE_MIRROR:="http://dl-cdn.alpinelinux.org/alpine"}
 : ${CLEANUP:="yes"}
 : ${IMAGE_FORMAT:=}
 : ${IMAGE_SIZE:="2G"}
