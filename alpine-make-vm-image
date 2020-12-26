@@ -19,7 +19,8 @@
 # --partition.
 #
 # Arguments:
-#   <image>                               Path of disk image to use or create if not exists.
+#   <image>                               Path of block device or disk image file to use or create
+#                                         if it does not exist.
 #
 #   <script>                              Path of script to execute after installing base system in
 #                                         the mounted image and before umounting it.
@@ -48,10 +49,12 @@
 #   -P --partition (PARTITION)            Create GUID Partition Table (GPT) with a single partition.
 #                                         GPT is always created if --boot-mode is UEFI.
 #
-#   -f --image-format IMAGE_FORMAT        Format of the disk image (see qemu-img --help).
+#   -f --image-format IMAGE_FORMAT        Format of the disk image (see qemu-img --help). Not
+#                                         applicable if the target image is a block device.
 #
 #   -s --image-size IMAGE_SIZE            Size of the disk image to create in bytes or with suffix
-#                                         (e.g. 1G, 1024M). Default is 2G.
+#                                         (e.g. 1G, 1024M). Default is 2G. Not applicable if the
+#                                         target image is a block device.
 #
 #   -i --initfs-features INITFS_FEATURES  List of additional mkinitfs features (basically modules)
 #                                         to be included in initramfs (see mkinitfs -L). "base" and
@@ -173,7 +176,7 @@ cleanup() {
 			|| die "Failed to unmount $mount_dir; unmount it and disconnect $disk_dev manually"
 		rm -Rf "$mount_dir"
 	fi
-	if [ "$disk_dev" ]; then
+	if [ "$disk_dev" ] && ! [ -b "$IMAGE_FILE" ]; then
 		qemu-nbd --disconnect "$disk_dev" \
 			|| die "Failed to disconnect $disk_dev; disconnect it manually"
 	fi
@@ -505,16 +508,21 @@ if ! command -v "$APK" >/dev/null; then
 fi
 
 #-----------------------------------------------------------------------
-if [ ! -f "$IMAGE_FILE" ]; then
+if [ ! -f "$IMAGE_FILE" ] && [ ! -b "$IMAGE_FILE" ]; then
 	einfo "Creating $IMAGE_FORMAT image of size $IMAGE_SIZE"
 	qemu-img create ${IMAGE_FORMAT:+-f $IMAGE_FORMAT} "$IMAGE_FILE" "$IMAGE_SIZE"
 fi
 
 #-----------------------------------------------------------------------
-einfo "Attaching image $IMAGE_FILE as a NBD device"
+if [ -b "$IMAGE_FILE" ]; then
+	echo "Provided target $IMAGE_FILE is a block device" >&2
 
-disk_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
+	disk_dev="$IMAGE_FILE"
+else
+	einfo "Attaching image $IMAGE_FILE as a NBD device"
 
+	disk_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
+fi
 
 #-----------------------------------------------------------------------
 if [ "$PARTITION" = yes ] || [ "$BOOT_MODE" = 'UEFI' ]; then
