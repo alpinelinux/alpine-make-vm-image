@@ -39,6 +39,9 @@
 #   -k --kernel-flavor KERNEL_FLAVOR      The kernel flavour to install; virt (default), lts
 #                                         (Alpine >=3.11), or vanilla (Alpine <3.11).
 #
+#   -n --no-firmware FIRMWARE_NONE        When installing the kernel, don't install any firmware
+#                                         by adding the package 'linux-firmware-none'.
+#
 #      --keys-dir KEYS_DIR                Path of directory with Alpine keys to copy into the image.
 #                                         Default is /etc/apk/keys. If does not exist, keys for
 #                                         x86_64 embedded in this script will be used.
@@ -312,8 +315,8 @@ wgets() (
 
 #=============================  M a i n  ==============================#
 
-opts=$(getopt -n $PROGNAME -o b:cCf:hi:k:p:r:s:tv \
-	-l branch:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
+opts=$(getopt -n $PROGNAME -o b:cCf:hi:k:np:r:s:tv \
+	-l branch:,image-format:,image-size:,initfs-features:,kernel-flavor:,no-firmware,keys-dir:,mirror-uri:,no-cleanup,packages:,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
 	-- "$@") || help 1 >&2
 
 eval set -- "$opts"
@@ -325,6 +328,7 @@ while [ $# -gt 0 ]; do
 		-s | --image-size) IMAGE_SIZE="$2";;
 		-i | --initfs-features) INITFS_FEATURES="${INITFS_FEATURES:-} $2";;
 		-k | --kernel-flavor) KERNEL_FLAVOR="$2";;
+		-n | --no-firmware) FIRMWARE_NONE='yes'; n=1;;
 		     --keys-dir) KEYS_DIR="$(realpath "$2")";;
 		-m | --mirror-uri) ALPINE_MIRROR="$2";;
 		-C | --no-cleanup) CLEANUP='no'; n=1;;
@@ -347,6 +351,7 @@ done
 : ${IMAGE_SIZE:="2G"}
 : ${INITFS_FEATURES:="scsi virtio"}
 : ${KERNEL_FLAVOR:="virt"}
+: ${FIRMWARE_NONE:="no"}
 : ${KEYS_DIR:="/etc/apk/keys"}
 : ${PACKAGES:=}
 : ${REPOS_FILE:="/etc/apk/repositories"}
@@ -464,7 +469,11 @@ setup_mkinitfs . "base $ROOTFS $INITFS_FEATURES"
 #-----------------------------------------------------------------------
 einfo "Installing kernel linux-$KERNEL_FLAVOR"
 
-_apk add --root . linux-$KERNEL_FLAVOR
+if [ "$FIRMWARE_NONE" = 'no' ]; then
+	_apk add --root . linux-$KERNEL_FLAVOR
+else
+	_apk add --root . linux-$KERNEL_FLAVOR linux-firmware-none
+fi
 
 #-----------------------------------------------------------------------
 einfo 'Setting up extlinux bootloader'
