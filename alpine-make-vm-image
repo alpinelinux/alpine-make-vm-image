@@ -170,12 +170,12 @@ cleanup() {
 	fi
 	if [ "$mount_dir" ]; then
 		umount_recursively "$mount_dir" \
-			|| die "Failed to unmount $mount_dir; unmount it and disconnect $nbd_dev manually"
+			|| die "Failed to unmount $mount_dir; unmount it and disconnect $disk_dev manually"
 		rm -Rf "$mount_dir"
 	fi
-	if [ "$nbd_dev" ]; then
-		qemu-nbd --disconnect "$nbd_dev" \
-			|| die "Failed to disconnect $nbd_dev; disconnect it manually"
+	if [ "$disk_dev" ]; then
+		qemu-nbd --disconnect "$disk_dev" \
+			|| die "Failed to disconnect $disk_dev; disconnect it manually"
 	fi
 	if [ "$INSTALL_HOST_PKGS" = yes ]; then
 		_apk del $VIRTUAL_PKG
@@ -190,17 +190,17 @@ _apk() {
 attach_image() {
 	local image="$1"
 	local format="${2:-}"
-	local nbd_dev
+	local disk_dev
 
-	nbd_dev=$(get_available_nbd) || {
+	disk_dev=$(get_available_nbd) || {
 		modprobe nbd max_part=16
 		sleep 1
-		nbd_dev=$(get_available_nbd)
+		disk_dev=$(get_available_nbd)
 	} || die 'No available nbd device found!'
 
-	qemu-nbd --connect="$nbd_dev" --cache=writeback \
+	qemu-nbd --connect="$disk_dev" --cache=writeback \
 		${format:+--format=$format} "$image" \
-		&& echo "$nbd_dev"
+		&& echo "$disk_dev"
 }
 
 # Prints UUID of filesystem on the specified block device.
@@ -223,7 +223,7 @@ create_gpt() {
 			'label: gpt' \
 			'name=efi,type=U,size=128M,bootable' \
 			'name=system,type=L' \
-			| sfdisk "$nbd_dev" ;;
+			| sfdisk "$disk_dev" ;;
 		*) die "Invalid mode: $mode" ;;
 	esac
 }
@@ -513,25 +513,25 @@ fi
 #-----------------------------------------------------------------------
 einfo "Attaching image $IMAGE_FILE as a NBD device"
 
-nbd_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
+disk_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
 
 
 #-----------------------------------------------------------------------
 if [ "$PARTITION" = yes ] || [ "$BOOT_MODE" = 'UEFI' ]; then
 	einfo 'Creating GPT partition table'
 
-	create_gpt "$nbd_dev" "$BOOT_MODE"
+	create_gpt "$disk_dev" "$BOOT_MODE"
 
 	if [ "$BOOT_MODE" = 'BIOS' ]; then
-		root_dev="${nbd_dev}p1"
+		root_dev="${disk_dev}p1"
 	else
-		esp_dev="${nbd_dev}p1"
-		root_dev="${nbd_dev}p2"
+		esp_dev="${disk_dev}p1"
+		root_dev="${disk_dev}p2"
 	fi
 	# This is needed when running in a container.
 	settle_dev_node "$root_dev" || die "system didn't create $root_dev node"
 else
-	root_dev="$nbd_dev"
+	root_dev="$disk_dev"
 fi
 
 #-----------------------------------------------------------------------
@@ -620,7 +620,7 @@ if [ "$BOOT_MODE" = 'BIOS' ]; then
 	setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT"
 
 	if [ "$PARTITION" = yes ]; then
-		dd bs=440 count=1 conv=notrunc if=usr/share/syslinux/gptmbr.bin of="$nbd_dev"
+		dd bs=440 count=1 conv=notrunc if=usr/share/syslinux/gptmbr.bin of="$disk_dev"
 		sync
 	fi
 fi
