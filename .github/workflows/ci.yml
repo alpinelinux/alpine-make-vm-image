@@ -22,3 +22,7 @@ jobs:
               --packages "$(cat example/packages)" \
               --script-chroot \
               alpine-virthardened-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh
+
+      - name: Test single function
+        run: |
+          sudo bash -c '. ./alpine-make-vm-image --version && get_available_nbd | grep "/dev/nbd"'

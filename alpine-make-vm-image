@@ -334,7 +334,7 @@ while [ $# -gt 0 ]; do
 		-t | --serial-console) SERIAL_CONSOLE='yes'; n=1;;
 		-c | --script-chroot) SCRIPT_CHROOT='yes'; n=1;;
 		-h | --help) help 0;;
-		-V | --version) echo "$PROGNAME $VERSION"; exit 0;;
+		-V | --version) echo "$PROGNAME $VERSION"; return;;
 		--) shift; break;;
 	esac
 	shift $n
