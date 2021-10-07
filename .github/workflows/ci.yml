@@ -24,4 +24,6 @@ jobs:
                 --packages "$(cat targets/${t}/packages)" \
                 --script-chroot \
                 alpine-${t}-$(date +%Y-%m-%d).qcow2 -- ./targets/${t}/configure.sh
+            tar -czvf alpine-${t}-$(date +%Y-%m-%d).tar.gz alpine-${t}-$(date +%Y-%m-%d).qcow2
           done
+          ls -la
