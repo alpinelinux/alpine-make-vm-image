@@ -19,7 +19,7 @@ jobs:
           for t in $(ls -1 targets/); do
             sudo ./alpine-make-vm-image \
                 --image-format qcow2 \
-                --image-size 2G \
+                --image-size 4G \
                 --repositories-file targets/${t}/repositories \
                 --packages "$(cat targets/${t}/packages)" \
                 --script-chroot \
