@@ -27,3 +27,29 @@ jobs:
             tar -czvf alpine-${t}-$(date +%Y-%m-%d).tar.gz alpine-${t}-$(date +%Y-%m-%d).qcow2
           done
           ls -la
+
+      - name: Bump version and push tag if needed
+        id: tag_version
+        if: github.event_name == 'push'
+        uses: mathieudutour/github-tag-action@v5.6
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: false
+
+      - uses: dev-drprasad/delete-older-releases@v0.2.0
+        if: ${{ steps.tag_version.outputs.new_tag }}
+        with:
+          keep_latest: 3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: softprops/action-gh-release@v1
+        if: ${{ steps.tag_version.outputs.new_tag }}
+        with:
+          token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          body: ${{ steps.tag_version.outputs.changelog }}
+          tag_name: ${{ steps.tag_version.outputs.new_tag }}
+          files: |
+            alpine-*.tar.gz
