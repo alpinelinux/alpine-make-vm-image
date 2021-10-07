@@ -20,8 +20,8 @@ jobs:
             sudo ./alpine-make-vm-image \
                 --image-format qcow2 \
                 --image-size 2G \
-                --repositories-file ${t}/repositories \
-                --packages "$(cat ${t}/packages)" \
+                --repositories-file targets/${t}/repositories \
+                --packages "$(cat targets/${t}/packages)" \
                 --script-chroot \
-                alpine-${t}-$(date +%Y-%m-%d).qcow2 -- ./${t}/configure.sh
+                alpine-${t}-$(date +%Y-%m-%d).qcow2 -- ./targets/${t}/configure.sh
           done
