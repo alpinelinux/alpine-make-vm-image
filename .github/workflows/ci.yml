@@ -16,10 +16,12 @@ jobs:
 
       - name: Build image
         run: |
-          sudo ./alpine-make-vm-image \
-              --image-format qcow2 \
-              --image-size 2G \
-              --repositories-file example/repositories \
-              --packages "$(cat example/packages)" \
-              --script-chroot \
-              alpine-virthardened-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh
+          for t in $(ls -1 targets/); do
+            sudo ./alpine-make-vm-image \
+                --image-format qcow2 \
+                --image-size 2G \
+                --repositories-file ${t}/repositories \
+                --packages "$(cat ${t}/packages)" \
+                --script-chroot \
+                alpine-${t}-$(date +%Y-%m-%d).qcow2 -- ./${t}/configure.sh
+          done
