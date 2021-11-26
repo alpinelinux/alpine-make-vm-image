@@ -465,7 +465,12 @@ setup_mkinitfs . "base $ROOTFS $INITFS_FEATURES"
 #-----------------------------------------------------------------------
 einfo "Installing kernel linux-$KERNEL_FLAVOR"
 
-_apk add --root . linux-$KERNEL_FLAVOR
+if [ "$KERNEL_FLAVOR" = 'virt' ]; then
+	_apk add --root . linux-$KERNEL_FLAVOR
+else
+	# Avoid installing *all* linux-firmware-* packages (see #21).
+	_apk add --root . linux-$KERNEL_FLAVOR linux-firmware-none
+fi
 
 #-----------------------------------------------------------------------
 einfo 'Setting up extlinux bootloader'
