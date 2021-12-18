@@ -72,9 +72,9 @@
 #   APK_OPTS                              Options to pass into apk on each execution.
 #                                         Default is "--no-progress".
 #
-#   APK_TOOLS_URI                         URL of static apk-tools tarball to download if $APK is
-#                                         not found on the host system. Default is x86_64 apk-tools
-#                                         from https://github.com/alpinelinux/apk-tools/releases.
+#   APK_TOOLS_URI                         URL of apk-tools binary to download if $APK is not found
+#                                         on the host system. Default is x86_64 apk.static from
+#                                         https://gitlab.alpinelinux.org/alpine/apk-tools/-/packages.
 #
 #   APK_TOOLS_SHA256                      SHA-256 checksum of $APK_TOOLS_URI.
 #
@@ -100,8 +100,8 @@ alpine-devel@lists.alpinelinux.org-5261cecb.rsa.pub:MIIBIjANBgkqhkiG9w0BAQEFAAOC
 alpine-devel@lists.alpinelinux.org-6165ee59.rsa.pub:MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAutQkua2CAig4VFSJ7v54\nALyu/J1WB3oni7qwCZD3veURw7HxpNAj9hR+S5N/pNeZgubQvJWyaPuQDm7PTs1+\ntFGiYNfAsiibX6Rv0wci3M+z2XEVAeR9Vzg6v4qoofDyoTbovn2LztaNEjTkB+oK\ntlvpNhg1zhou0jDVYFniEXvzjckxswHVb8cT0OMTKHALyLPrPOJzVtM9C1ew2Nnc\n3848xLiApMu3NBk0JqfcS3Bo5Y2b1FRVBvdt+2gFoKZix1MnZdAEZ8xQzL/a0YS5\nHd0wj5+EEKHfOd3A75uPa/WQmA+o0cBFfrzm69QDcSJSwGpzWrD1ScH3AK8nWvoj\nv7e9gukK/9yl1b4fQQ00vttwJPSgm9EnfPHLAtgXkRloI27H6/PuLoNvSAMQwuCD\nhQRlyGLPBETKkHeodfLoULjhDi1K2gKJTMhtbnUcAA7nEphkMhPWkBpgFdrH+5z4\nLxy+3ek0cqcI7K68EtrffU8jtUj9LFTUC8dERaIBs7NgQ/LfDbDfGh9g6qVj1hZl\nk9aaIPTm/xsi8v3u+0qaq7KzIBc9s59JOoA8TlpOaYdVgSQhHHLBaahOuAigH+VI\nisbC9vmqsThF2QdDtQt37keuqoda2E6sL7PUvIyVXDRfwX7uMDjlzTxHTymvq2Ck\nhtBqojBnThmjJQFgZXocHG8CAwEAAQ==
 '
 
-: ${APK_TOOLS_URI:="https://github.com/alpinelinux/apk-tools/releases/download/v2.10.4/apk-tools-2.10.4-x86_64-linux.tar.gz"}
-: ${APK_TOOLS_SHA256:="efe948160317fe78058e207554d0d9195a3dfcc35f77df278d30448d7b3eb892"}
+: ${APK_TOOLS_URI:="https://gitlab.alpinelinux.org/api/v4/projects/5/packages/generic/v2.12.9/x86_64/apk.static"}
+: ${APK_TOOLS_SHA256:="5176da3d4c41f12a08b82809aca8e7e2e383b7930979651b8958eca219815af5"}
 
 : ${APK:="apk"}
 : ${APK_OPTS:="--no-progress"}
@@ -395,8 +395,8 @@ if ! command -v "$APK" >/dev/null; then
 
 	temp_dir="$(mktemp -d /tmp/$PROGNAME.XXXXXX)"
 	wgets "$APK_TOOLS_URI" "$APK_TOOLS_SHA256" "$temp_dir"
-	tar -C "$temp_dir" -xzf "$temp_dir/${APK_TOOLS_URI##*/}"
-	APK="$(ls "$temp_dir"/apk-tools-*/apk)"
+	APK="$temp_dir/apk.static"
+	chmod +x "$APK"
 fi
 
 #-----------------------------------------------------------------------
