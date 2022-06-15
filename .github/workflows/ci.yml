@@ -7,12 +7,23 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Install qemu-utils
+      - name: Install tools
+        env:
+          SHELLCHECK_VERSION: v0.8.0
+          SHELLCHECK_SHA256: f4bce23c11c3919c1b20bcb0f206f6b44c44e26f2bc95f8aa708716095fa0651
         run: |
           sudo apt-get update
           sudo apt-get install qemu-utils
 
+          wget -qO- "https://github.com/koalaman/shellcheck/releases/download/$SHELLCHECK_VERSION/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+              | tar -C /usr/local/bin -xJv --strip-components=1 "shellcheck-$SHELLCHECK_VERSION/shellcheck"
+          echo "$SHELLCHECK_SHA256 */usr/local/bin/shellcheck" | sha256sum -c
+          shellcheck --version
+
       - uses: actions/checkout@v2
+
+      - name: ShellCheck
+        run: shellcheck alpine-make-vm-image
 
       - name: Build image
         run: |

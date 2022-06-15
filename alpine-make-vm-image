@@ -1,5 +1,6 @@
 #!/bin/sh
 # vim: set ts=4:
+# shellcheck disable=SC3043
 #---help---
 # Usage: alpine-make-vm-image [options] [--] <image> [<script> [<script-opts...>]]
 #
@@ -100,11 +101,11 @@ alpine-devel@lists.alpinelinux.org-5261cecb.rsa.pub:MIIBIjANBgkqhkiG9w0BAQEFAAOC
 alpine-devel@lists.alpinelinux.org-6165ee59.rsa.pub:MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAutQkua2CAig4VFSJ7v54\nALyu/J1WB3oni7qwCZD3veURw7HxpNAj9hR+S5N/pNeZgubQvJWyaPuQDm7PTs1+\ntFGiYNfAsiibX6Rv0wci3M+z2XEVAeR9Vzg6v4qoofDyoTbovn2LztaNEjTkB+oK\ntlvpNhg1zhou0jDVYFniEXvzjckxswHVb8cT0OMTKHALyLPrPOJzVtM9C1ew2Nnc\n3848xLiApMu3NBk0JqfcS3Bo5Y2b1FRVBvdt+2gFoKZix1MnZdAEZ8xQzL/a0YS5\nHd0wj5+EEKHfOd3A75uPa/WQmA+o0cBFfrzm69QDcSJSwGpzWrD1ScH3AK8nWvoj\nv7e9gukK/9yl1b4fQQ00vttwJPSgm9EnfPHLAtgXkRloI27H6/PuLoNvSAMQwuCD\nhQRlyGLPBETKkHeodfLoULjhDi1K2gKJTMhtbnUcAA7nEphkMhPWkBpgFdrH+5z4\nLxy+3ek0cqcI7K68EtrffU8jtUj9LFTUC8dERaIBs7NgQ/LfDbDfGh9g6qVj1hZl\nk9aaIPTm/xsi8v3u+0qaq7KzIBc9s59JOoA8TlpOaYdVgSQhHHLBaahOuAigH+VI\nisbC9vmqsThF2QdDtQt37keuqoda2E6sL7PUvIyVXDRfwX7uMDjlzTxHTymvq2Ck\nhtBqojBnThmjJQFgZXocHG8CAwEAAQ==
 '
 
-: ${APK_TOOLS_URI:="https://gitlab.alpinelinux.org/api/v4/projects/5/packages/generic/v2.12.9/x86_64/apk.static"}
-: ${APK_TOOLS_SHA256:="5176da3d4c41f12a08b82809aca8e7e2e383b7930979651b8958eca219815af5"}
+: "${APK_TOOLS_URI:="https://gitlab.alpinelinux.org/api/v4/projects/5/packages/generic/v2.12.9/x86_64/apk.static"}"
+: "${APK_TOOLS_SHA256:="5176da3d4c41f12a08b82809aca8e7e2e383b7930979651b8958eca219815af5"}"
 
-: ${APK:="apk"}
-: ${APK_OPTS:="--no-progress"}
+: "${APK:="apk"}"
+: "${APK_OPTS:="--no-progress"}"
 
 
 # For compatibility with systems that does not have "realpath" command.
@@ -124,7 +125,7 @@ einfo() {
 # Prints help and exists with the specified status.
 help() {
 	sed -En '/^#---help---/,/^#---help---/p' "$0" | sed -E 's/^# ?//; 1d;$d;'
-	exit ${1:-0}
+	exit "${1:-0}"
 }
 
 # Cleans the host system. This function is executed before exiting the script.
@@ -187,6 +188,8 @@ dump_alpine_keys() {
 		file=${line%%:*}
 		content=${line#*:}
 
+		# shellcheck disable=SC2059
+		# $content contains escape sequences that should be processed by printf.
 		printf -- "-----BEGIN PUBLIC KEY-----\n$content\n-----END PUBLIC KEY-----\n" \
 			> "$dest_dir/$file"
 	done
@@ -194,7 +197,10 @@ dump_alpine_keys() {
 
 # Prints path of available nbdX device, or returns 1 if not any.
 get_available_nbd() {
-	local dev; for dev in $(find /dev -maxdepth 2 -name 'nbd[0-9]*'); do
+	local dev
+	# shellcheck disable=SC2044
+	# The find loop is safe as it will only enumerate paths that don't require shell escaping.
+	for dev in $(find /dev -maxdepth 2 -name 'nbd[0-9]*'); do
 		if [ "$(blockdev --getsize64 "$dev")" -eq 0 ]; then
 			echo "$dev"; return 0
 		fi
@@ -239,8 +245,8 @@ rc_add() {
 	local services="$*"  # names of services
 
 	local svc; for svc in $services; do
-		mkdir -p etc/runlevels/$runlevel
-		ln -s /etc/init.d/$svc etc/runlevels/$runlevel/$svc
+		mkdir -p "etc/runlevels/$runlevel"
+		ln -s "/etc/init.d/$svc" "etc/runlevels/$runlevel/$svc"
 		echo " * service $svc added to runlevel $runlevel"
 	done
 }
@@ -281,7 +287,7 @@ setup_mkinitfs() {
 	local mnt="$1"  # path of directory where is root device currently mounted
 	local features="$2"  # list of mkinitfs features
 
-	features=$(printf '%s\n' $features | sort | uniq | xargs)
+	features=$(printf '%s\n' "$features" | sort | uniq | xargs)
 
 	sed -Ei "s|^[# ]*(features)=.*|\1=\"$features\"|" \
 		"$mnt"/etc/mkinitfs/mkinitfs.conf
@@ -292,8 +298,7 @@ umount_recursively() {
 	local mount_point="$1"
 	test -n "$mount_point" || return 1
 
-	cat /proc/mounts \
-		| cut -d ' ' -f 2 \
+	cut -d ' ' -f 2 /proc/mounts \
 		| grep "^$mount_point" \
 		| sort -r \
 		| xargs umount -rn
@@ -341,28 +346,28 @@ while [ $# -gt 0 ]; do
 	shift $n
 done
 
-: ${ALPINE_BRANCH:="latest-stable"}
-: ${ALPINE_MIRROR:="http://dl-cdn.alpinelinux.org/alpine"}
-: ${CLEANUP:="yes"}
-: ${IMAGE_FORMAT:=}
-: ${IMAGE_SIZE:="2G"}
-: ${INITFS_FEATURES:="scsi virtio"}
-: ${KERNEL_FLAVOR:="virt"}
-: ${KEYS_DIR:="/etc/apk/keys"}
-: ${PACKAGES:=}
-: ${REPOS_FILE:="/etc/apk/repositories"}
-: ${ROOTFS:="ext4"}
-: ${SCRIPT_CHROOT:="no"}
-: ${SERIAL_CONSOLE:="no"}
+: "${ALPINE_BRANCH:="latest-stable"}"
+: "${ALPINE_MIRROR:="http://dl-cdn.alpinelinux.org/alpine"}"
+: "${CLEANUP:="yes"}"
+: "${IMAGE_FORMAT:=}"
+: "${IMAGE_SIZE:="2G"}"
+: "${INITFS_FEATURES:="scsi virtio"}"
+: "${KERNEL_FLAVOR:="virt"}"
+: "${KEYS_DIR:="/etc/apk/keys"}"
+: "${PACKAGES:=}"
+: "${REPOS_FILE:="/etc/apk/repositories"}"
+: "${ROOTFS:="ext4"}"
+: "${SCRIPT_CHROOT:="no"}"
+: "${SERIAL_CONSOLE:="no"}"
 
 case "$ALPINE_BRANCH" in
 	[0-9]*) ALPINE_BRANCH="v$ALPINE_BRANCH";;
 esac
 
 if [ -f /etc/alpine-release ]; then
-	: ${INSTALL_HOST_PKGS:="yes"}
+	: "${INSTALL_HOST_PKGS:="yes"}"
 else
-	: ${INSTALL_HOST_PKGS:="no"}
+	: "${INSTALL_HOST_PKGS:="no"}"
 fi
 
 SERIAL_PORT=
@@ -385,7 +390,7 @@ if [ "$INSTALL_HOST_PKGS" = yes ]; then
 	if ! grep -q -w "$ROOTFS" /proc/filesystems; then
 		modprobe $ROOTFS
 	fi
-	_apk add -t $VIRTUAL_PKG qemu-img $(fs_progs_pkg "$ROOTFS")
+	_apk add -t $VIRTUAL_PKG qemu-img "$(fs_progs_pkg "$ROOTFS")"
 fi
 
 #-----------------------------------------------------------------------
@@ -493,7 +498,9 @@ fi
 einfo 'Enabling base system services'
 
 rc_add sysinit devfs dmesg mdev hwdrivers
-[ -e etc/init.d/cgroups ] && rc_add sysinit cgroups ||:  # since v3.8
+if [ -e etc/init.d/cgroups ]; then
+	rc_add sysinit cgroups  # since v3.8
+fi
 
 rc_add boot modules hwclock swap hostname sysctl bootmisc syslog
 rc_add shutdown killprocs savecache mount-ro
