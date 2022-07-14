@@ -22,4 +22,4 @@ jobs:
               --repositories-file example/repositories \
               --packages "$(cat example/packages)" \
               --script-chroot \
-              alpine-virthardened-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh
+              alpine-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh
