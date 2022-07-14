@@ -485,8 +485,8 @@ EOF
 
 #-----------------------------------------------------------------------
 if [ "$SERIAL_PORT" ]; then
-	echo "$SERIAL_PORT" >> "$mount_dir"/etc/securetty
-	sed -Ei "s|^[# ]*($SERIAL_PORT:.*)|\1|" "$mount_dir"/etc/inittab
+	echo "$SERIAL_PORT" >> etc/securetty
+	sed -Ei "s|^[# ]*($SERIAL_PORT:.*)|\1|" etc/inittab
 fi
 
 #-----------------------------------------------------------------------
