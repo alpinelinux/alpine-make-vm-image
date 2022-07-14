@@ -484,6 +484,18 @@ cat > etc/fstab <<-EOF
 EOF
 
 #-----------------------------------------------------------------------
+einfo 'Configuring system'
+
+# We just prepare this config, but don't start the networking service.
+cat > etc/network/interfaces <<-EOF
+	iface lo inet loopback
+
+	iface eth0 inet dhcp
+
+	post-up /etc/network/if-post-up.d/*
+	post-down /etc/network/if-post-down.d/*
+EOF
+
 if [ "$SERIAL_PORT" ]; then
 	echo "$SERIAL_PORT" >> etc/securetty
 	sed -Ei "s|^[# ]*($SERIAL_PORT:.*)|\1|" etc/inittab
