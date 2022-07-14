@@ -1,5 +1,7 @@
 #!/bin/sh
 # vim: set ts=4:
+# SPDX-FileCopyrightText: © 2017 Jakub Jirutka <jakub@jirutka.cz>
+# SPDX-License-Identifier: MIT
 #---help---
 # Usage: alpine-make-vm-image [options] [--] <image> [<script> [<script-opts...>]]
 #
