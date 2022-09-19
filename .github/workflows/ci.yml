@@ -21,5 +21,7 @@ jobs:
               --image-size 2G \
               --repositories-file example/repositories \
               --packages "$(cat example/packages)" \
+              --fs-skel-dir example/rootfs \
+              --fs-skel-chown root:root \
               --script-chroot \
               alpine-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh

@@ -32,3 +32,6 @@ rc-update add crond default
 rc-update add net.eth0 default
 rc-update add net.lo boot
 rc-update add termencoding boot
+
+step 'List /usr/local/bin'
+ls -la /usr/local/bin
