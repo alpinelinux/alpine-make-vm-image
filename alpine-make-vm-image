@@ -62,10 +62,9 @@
 #
 #   -p --packages PACKAGES                Additional packages to install into the image.
 #
-#   -r --repositories-file REPOS_FILE     Path of repositories file to copy into the rootfs.
-#                                         Default is /etc/apk/repositories. If does not exist,
-#                                         repositories file with Alpine's main and community
-#                                         repositories on --mirror-uri is created.
+#   -r --repositories-file REPOS_FILE     Path of the repositories file to copy into the rootfs.
+#                                         If not provided, Alpine's main and community repositories
+#                                         on --mirror-uri will be used.
 #
 #      --rootfs ROOTFS                    Filesystem to create on the image. Default is ext4.
 #
@@ -367,7 +366,7 @@ done
 : ${KEYS_DIR:="/etc/apk/keys"}
 : ${PACKAGES:=}
 : ${PARTITION:="no"}
-: ${REPOS_FILE:="/etc/apk/repositories"}
+: ${REPOS_FILE:=}
 : ${ROOTFS:="ext4"}
 : ${SCRIPT_CHROOT:="no"}
 : ${SERIAL_CONSOLE:="no"}
@@ -462,7 +461,7 @@ einfo 'Installing base system'
 cd "$mount_dir"
 
 mkdir -p etc/apk/keys
-if [ -f "$REPOS_FILE" ]; then
+if [ "$REPOS_FILE" ]; then
 	install -m 644 "$REPOS_FILE" etc/apk/repositories
 else
 	cat > etc/apk/repositories <<-EOF
