@@ -23,6 +23,7 @@ TIP: Don’t need VM, just wanna chroot into Alpine Linux?
 * POSIX-sh compatible shell (e.g. Busybox ash, dash, Bash, ZSH)
 * qemu-img and qemu-nbd (automatically installed by the script if running on Alpine)
 * rsync (needed only for `--fs-skel-dir`; automatically installed by the script if running on Alpine)
+* sfdisk (needed only for `--partition`; automatically installed by the script if running on Alpine)
 * e2fsprogs (for ext4), btrfs-progs (for Btrfs), or xfsprogs (for XFS) (automatically installed by the script if running on Alpine)
 
 
