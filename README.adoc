@@ -41,6 +41,8 @@ wget https://raw.githubusercontent.com/{gh-name}/v{version}/{script-name} \
     && echo '{script-sha1}  {script-name}' | sha1sum -c \
     || exit 1
 
+Or, if you are on Alpine Linux, you can simply install the https://pkgs.alpinelinux.org/packages?name={script-name}[{script-name}] package.
+
 
 == Pitfalls
 
