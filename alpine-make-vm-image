@@ -588,6 +588,8 @@ if grep -qw "$RESOLVCONF_MARK" etc/resolv.conf 2>/dev/null; then
 	EOF
 fi
 
+rm -Rf var/cache/apk/* ||:
+
 einfo 'Completed'
 
 cd - >/dev/null
