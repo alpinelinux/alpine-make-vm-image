@@ -241,6 +241,10 @@ prepare_chroot() {
 	mount_bind /dev "$dest"/dev
 	mount_bind /sys "$dest"/sys
 
+	if [ -n "$apk_cache_dir" ]; then
+		mount_bind "$apk_cache_dir" "$dest/$apk_cache_dir"
+	fi
+
 	install -D -m 644 /etc/resolv.conf "$dest"/etc/resolv.conf
 	echo "$RESOLVCONF_MARK" >> "$dest"/etc/resolv.conf
 }
@@ -479,8 +483,10 @@ else
 fi
 
 # Use APK cache if available.
+apk_cache_dir=
 if [ -L /etc/apk/cache ]; then
-	ln -s "$(realpath /etc/apk/cache)" etc/apk/cache
+	apk_cache_dir="$(realpath /etc/apk/cache)"
+	ln -s "$apk_cache_dir" etc/apk/cache
 fi
 
 _apk add --root . --update-cache --initdb alpine-base
@@ -547,11 +553,6 @@ if [ "$PACKAGES" ]; then
 fi
 
 #-----------------------------------------------------------------------
-if [ -L /etc/apk/cache ]; then
-	rm etc/apk/cache >/dev/null 2>&1
-fi
-
-#-----------------------------------------------------------------------
 if [ "$FS_SKEL_DIR" ]; then
 	einfo "Copying content of $FS_SKEL_DIR into image"
 
@@ -588,7 +589,11 @@ if grep -qw "$RESOLVCONF_MARK" etc/resolv.conf 2>/dev/null; then
 	EOF
 fi
 
-rm -Rf var/cache/apk/* ||:
+if [ -n "$apk_cache_dir" ]; then
+    rm etc/apk/cache >/dev/null 2>&1
+else
+    rm -Rf var/cache/apk/* ||:
+fi
 
 einfo 'Completed'
 
