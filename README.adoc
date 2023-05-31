@@ -24,6 +24,7 @@ TIP: Don’t need VM, just wanna chroot into Alpine Linux?
 * qemu-img and qemu-nbd
 * rsync (needed only for `--fs-skel-dir`)
 * sfdisk (needed only for `--partition`)
+* mdev or udevadm (needed only for `--partition` when device hotplug doesn’t work)
 * e2fsprogs (for ext4), btrfs-progs (for Btrfs), or xfsprogs (for XFS)
 
 All dependencies except the first two are automatically installed by the script when running on Alpine.

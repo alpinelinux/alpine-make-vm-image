@@ -225,6 +225,11 @@ fs_progs_pkg() {
 	esac
 }
 
+# Tests if the specified command exists on the system.
+has_cmd() {
+	command -v "$1" >/dev/null
+}
+
 # Binds the directory $1 at the mountpoint $2 and sets propagation to private.
 mount_bind() {
 	mkdir -p "$2"
@@ -256,6 +261,25 @@ rc_add() {
 		ln -s /etc/init.d/$svc etc/runlevels/$runlevel/$svc
 		echo " * service $svc added to runlevel $runlevel"
 	done
+}
+
+# Ensures that the specified device node exists.
+settle_dev_node() {
+	local dev="$1"
+
+	[ -e "$dev" ] && return 0
+
+	sleep 1  # give hotplug handler some time to kick in
+	[ -e "$dev" ] && return 0
+
+	if has_cmd udevadm; then
+		udevadm settle --exit-if-exists="$dev"
+	elif has_cmd mdev; then
+		mdev -s
+	fi
+	[ -e "$dev" ] && return 0
+
+	return 1
 }
 
 # Installs and configures extlinux.
@@ -439,6 +463,8 @@ if [ "$PARTITION" = yes ]; then
 		'name=system,type=L,bootable,attrs=LegacyBIOSBootable' \
 		| sfdisk "$nbd_dev"
 	root_dev="${nbd_dev}p1"
+	# This is needed when running in a container.
+	settle_dev_node "$root_dev" || die "system didn't create $root_dev node"
 else
 	root_dev="$nbd_dev"
 fi
