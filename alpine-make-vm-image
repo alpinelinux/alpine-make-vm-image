@@ -434,7 +434,10 @@ nbd_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
 if [ "$PARTITION" = yes ]; then
 	einfo 'Creating GPT partition table'
 
-	printf '%s\n' 'label: gpt' 'name=system,type=L,bootable' | sfdisk "$nbd_dev"
+	printf '%s\n' \
+		'label: gpt' \
+		'name=system,type=L,bootable,attrs=LegacyBIOSBootable' \
+		| sfdisk "$nbd_dev"
 	root_dev="${nbd_dev}p1"
 else
 	root_dev="$nbd_dev"
@@ -507,6 +510,11 @@ einfo 'Setting up extlinux bootloader'
 
 _apk add --root . --no-scripts syslinux
 setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT"
+
+if [ "$PARTITION" = yes ]; then
+	dd bs=440 count=1 conv=notrunc if=usr/share/syslinux/gptmbr.bin of="$nbd_dev"
+	sync
+fi
 
 cat > etc/fstab <<-EOF
 	# <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
