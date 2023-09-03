@@ -560,6 +560,9 @@ cat > etc/network/interfaces <<-EOF
 	post-down /etc/network/if-post-down.d/*
 EOF
 
+mkdir -p etc/network/if-post-up.d
+mkdir -p etc/network/if-post-down.d
+
 if [ "$SERIAL_PORT" ]; then
 	echo "$SERIAL_PORT" >> etc/securetty
 	sed -Ei "s|^[# ]*($SERIAL_PORT:.*)|\1|" etc/inittab
