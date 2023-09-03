@@ -552,8 +552,6 @@ einfo 'Configuring system'
 
 # We just prepare this config, but don't start the networking service.
 cat > etc/network/interfaces <<-EOF
-	iface lo inet loopback
-
 	iface eth0 inet dhcp
 
 	post-up /etc/network/if-post-up.d/*
