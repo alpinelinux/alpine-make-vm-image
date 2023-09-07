@@ -544,7 +544,7 @@ fi
 
 cat > etc/fstab <<-EOF
 	# <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
-	UUID=$root_uuid	/		$ROOTFS	noatime		0 1
+	UUID=$root_uuid	/		$ROOTFS	relatime	0 1
 EOF
 
 #-----------------------------------------------------------------------
