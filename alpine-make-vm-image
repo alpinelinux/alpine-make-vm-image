@@ -186,7 +186,7 @@ attach_image() {
 # Prints UUID of filesystem on the specified block device.
 blk_uuid() {
 	local dev="$1"
-	blkid "$dev" | sed -En 's/.*UUID="([^"]+)".*/\1/p'
+	blkid "$dev" | sed -En 's/.*\bUUID="([^"]+)".*/\1/p'
 }
 
 # Writes Alpine APK keys embedded in this script into directory $1.
