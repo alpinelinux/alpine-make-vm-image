@@ -24,7 +24,7 @@ jobs:
               --fs-skel-dir example/rootfs \
               --fs-skel-chown root:root \
               --script-chroot \
-              alpine-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh
+              alpine-bios-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh
 
       - name: Build image with partition
         run: |
@@ -37,4 +37,17 @@ jobs:
               --fs-skel-dir example/rootfs \
               --fs-skel-chown root:root \
               --script-chroot \
-              alpine2-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh
+              alpine-bios-part-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh
+
+      - name: Build image with UEFI boot mode
+        run: |
+          sudo ./alpine-make-vm-image \
+              --image-format qcow2 \
+              --image-size 2G \
+              --boot-mode UEFI \
+              --repositories-file example/repositories \
+              --packages "$(cat example/packages)" \
+              --fs-skel-dir example/rootfs \
+              --fs-skel-chown root:root \
+              --script-chroot \
+              alpine-uefi-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh

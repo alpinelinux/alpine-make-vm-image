@@ -9,7 +9,8 @@ image:https://github.com/{gh-name}/workflows/CI/badge.svg["Build Status", link="
 endif::env-github[]
 
 This project provides a script for making customized https://alpinelinux.org/[Alpine Linux] disk images for virtual machines.
-It’s quite simple (300 LoC of shell), fast (~32 seconds on GitHub Actions) and requires minimum dependencies (QEMU and filesystem tools).
+You can choose between BIOS mode (using https://syslinux.org/[Syslinux]) and UEFI mode (using Linux https://docs.kernel.org/admin-guide/efi-stub.html[EFI stub]).
+It’s quite simple (400 LoC of shell), fast (~32 seconds on GitHub Actions), requires minimum dependencies (QEMU and filesystem tools).
 
 TIP: Don’t need VM, just wanna chroot into Alpine Linux?
      Try https://github.com/alpinelinux/alpine-chroot-install[alpine-chroot-install]!
@@ -23,9 +24,10 @@ TIP: Don’t need VM, just wanna chroot into Alpine Linux?
 * POSIX-sh compatible shell (e.g. Busybox ash, dash, Bash, ZSH)
 * qemu-img and qemu-nbd
 * rsync (needed only for `--fs-skel-dir`)
-* sfdisk (needed only for `--partition`)
-* mdev or udevadm (needed only for `--partition` when device hotplug doesn’t work)
+* sfdisk (needed only for `--partition` and `--boot-mode UEFI`)
+* mdev or udevadm (needed only for `--partition` and `--boot-mode UEFI` if device hotplug doesn’t work)
 * e2fsprogs (for ext4), btrfs-progs (for Btrfs), or xfsprogs (for XFS)
+* dosfstools (needed only for `--boot-mode UEFI`)
 
 All dependencies except the first two are automatically installed by the script when running on Alpine.
 

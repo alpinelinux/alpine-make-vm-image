@@ -8,13 +8,15 @@
 # This script creates a bootable Alpine Linux disk image for virtual machines.
 # If running on Alpine system (detected by file /etc/alpine-release), then it
 # also installs needed packages on the host system. On other systems you must
-# install them yourself: qemu-img, qemu-nbd, rsync, sfdisk, and mkfs utility
-# for the chosen ROOTFS. If $APK is not available on the host system, then
-# static apk-tools specified by $APK_TOOLS_URI is downloaded and used.
+# install them yourself: qemu-img, qemu-nbd, rsync, sfdisk, dosfstools (for UEFI
+# mode) and mkfs utility for the chosen ROOTFS. If $APK is not available on the
+# host system, then static apk-tools specified by $APK_TOOLS_URI is downloaded
+# and used.
 #
-# Note that it does not create any partitions by default (it's really not
-# needed), filesystem is created directly on the image. If you must use some
-# platform that foolishly requires partitions in images, use --partition.
+# Note that in BIOS mode, it does not create any partitions by default (it's
+# really not needed), filesystem is created directly on the image. If you must
+# use some platform that foolishly requires partitions in images, use
+# --partition.
 #
 # Arguments:
 #   <image>                               Path of disk image to use or create if not exists.
@@ -25,6 +27,8 @@
 #   <script-opts>                         Arguments to pass to the script.
 #
 # Options and Environment Variables:
+#   -B --boot-mode BOOT_MODE              Either "BIOS" (default) or "UEFI".
+#
 #   -b --branch ALPINE_BRANCH             Alpine branch to install; used only when
 #                                         --repositories-file is not specified. Default is
 #                                         latest-stable.
@@ -36,6 +40,7 @@
 #                                         specified USER:GROUP.
 #
 #   -P --partition (PARTITION)            Create GUID Partition Table (GPT) with a single partition.
+#                                         GPT is always created for --boot-mode UEFI.
 #
 #   -f --image-format IMAGE_FORMAT        Format of the disk image (see qemu-img --help).
 #
@@ -187,6 +192,25 @@ attach_image() {
 blk_uuid() {
 	local dev="$1"
 	blkid "$dev" | sed -En 's/.*\bUUID="([^"]+)".*/\1/p'
+}
+
+# Creates GPT parition table on the device $1 for boot mode $2 (BIOS or UEFI).
+create_gpt() {
+	local dev="$1"
+	local mode="$2"
+
+	case "$mode" in
+		BIOS) printf '%s\n' \
+			'label: gpt' \
+			'name=system,type=L,bootable,attrs=LegacyBIOSBootable' \
+			| sfdisk "$dev" ;;
+		UEFI) printf '%s\n' \
+			'label: gpt' \
+			'name=efi,type=U,size=128M,bootable' \
+			'name=system,type=L' \
+			| sfdisk "$nbd_dev" ;;
+		*) die "Invalid mode: $mode" ;;
+	esac
 }
 
 # Writes Alpine APK keys embedded in this script into directory $1.
@@ -350,14 +374,15 @@ wgets() (
 
 #=============================  M a i n  ==============================#
 
-opts=$(getopt -n $PROGNAME -o b:cCf:hi:k:m:p:Pr:s:S:tv \
-	-l branch:,fs-skel-chown:,fs-skel-dir:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,partition,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
+opts=$(getopt -n $PROGNAME -o b:B:cCf:hi:k:m:p:Pr:s:S:tv \
+	-l boot-mode:,branch:,fs-skel-chown:,fs-skel-dir:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,partition,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
 	-- "$@") || help 1 >&2
 
 eval set -- "$opts"
 while [ $# -gt 0 ]; do
 	n=2
 	case "$1" in
+		-B | --boot-mode) BOOT_MODE="$2";;
 		-b | --branch) ALPINE_BRANCH="$2";;
 		-S | --fs-skel-dir) FS_SKEL_DIR="$(realpath "$2")";;
 		     --fs-skel-chown) FS_SKEL_CHOWN="$2";;
@@ -383,6 +408,7 @@ done
 
 : ${ALPINE_BRANCH:="latest-stable"}
 : ${ALPINE_MIRROR:="http://dl-cdn.alpinelinux.org/alpine"}
+: ${BOOT_MODE:="BIOS"}
 : ${CLEANUP:="yes"}
 : ${FS_SKEL_CHOWN:=}
 : ${FS_SKEL_DIR:=}
@@ -400,6 +426,11 @@ done
 
 case "$ALPINE_BRANCH" in
 	[0-9]*) ALPINE_BRANCH="v$ALPINE_BRANCH";;
+esac
+
+case "$BOOT_MODE" in
+	BIOS | UEFI) ;;
+	*) die "Invalid boot-mode: $BOOT_MODE";;
 esac
 
 if [ -f /etc/alpine-release ]; then
@@ -428,7 +459,9 @@ if [ "$INSTALL_HOST_PKGS" = yes ]; then
 	if ! grep -q -w "$ROOTFS" /proc/filesystems; then
 		modprobe $ROOTFS
 	fi
-	_apk add -t $VIRTUAL_PKG qemu-img $(fs_progs_pkg "$ROOTFS") rsync sfdisk
+
+	[ "$BOOT_MODE" = 'UEFI' ] && vfatpkg='dosfstools' || vfatpkg=
+	_apk add -t $VIRTUAL_PKG qemu-img $(fs_progs_pkg "$ROOTFS") $vfatpkg rsync sfdisk
 fi
 
 #-----------------------------------------------------------------------
@@ -455,14 +488,17 @@ nbd_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
 
 
 #-----------------------------------------------------------------------
-if [ "$PARTITION" = yes ]; then
+if [ "$PARTITION" = yes ] || [ "$BOOT_MODE" = 'UEFI' ]; then
 	einfo 'Creating GPT partition table'
 
-	printf '%s\n' \
-		'label: gpt' \
-		'name=system,type=L,bootable,attrs=LegacyBIOSBootable' \
-		| sfdisk "$nbd_dev"
-	root_dev="${nbd_dev}p1"
+	create_gpt "$nbd_dev" "$BOOT_MODE"
+
+	if [ "$BOOT_MODE" = 'BIOS' ]; then
+		root_dev="${nbd_dev}p1"
+	else
+		esp_dev="${nbd_dev}p1"
+		root_dev="${nbd_dev}p2"
+	fi
 	# This is needed when running in a container.
 	settle_dev_node "$root_dev" || die "system didn't create $root_dev node"
 else
@@ -470,7 +506,11 @@ else
 fi
 
 #-----------------------------------------------------------------------
-einfo "Formatting image to $ROOTFS"
+einfo 'Creating filesystem(s)'
+
+if [ "$BOOT_MODE" = 'UEFI' ]; then
+	mkfs.fat -F32 -n EFI "$esp_dev"
+fi
 
 # syslinux 6.0.3 cannot boot from ext4 w/ 64bit feature enabled.
 # -E nodiscard / -K - do not attempt to discard blocks at mkfs time (it's
@@ -486,6 +526,11 @@ mount_dir=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 einfo "Mounting image at $mount_dir"
 
 mount "$root_dev" "$mount_dir"
+
+if [ "$BOOT_MODE" = 'UEFI' ]; then
+	install -d -m 000 "$mount_dir"/boot
+	mount -t vfat "$esp_dev" "$mount_dir"/boot
+fi
 
 #-----------------------------------------------------------------------
 einfo 'Installing base system'
@@ -514,10 +559,11 @@ fi
 
 _apk add --root . --update-cache --initdb alpine-base
 
+fsprogs_pkgs=
 # btrfs doesn't use fsck, so we don't have to install btrfs-progs.
-if [ "$ROOTFS" != 'btrfs' ]; then
-	_apk add --root . $(fs_progs_pkg "$ROOTFS")
-fi
+[ "$ROOTFS" != 'btrfs' ] && fsprogs_pkgs="$(fs_progs_pkg "$ROOTFS")"
+[ "$BOOT_MODE" = 'UEFI' ] && fsprogs_pkgs="$fsprogs_pkgs dosfstools"
+[ "$fsprogs_pkgs" ] && _apk add --root . $fsprogs_pkgs
 
 prepare_chroot .
 
@@ -538,23 +584,40 @@ else
 fi
 
 #-----------------------------------------------------------------------
-einfo 'Setting up extlinux bootloader'
+if [ "$BOOT_MODE" = 'BIOS' ]; then
+	einfo 'Setting up extlinux bootloader'
 
-_apk add --root . --no-scripts syslinux
-setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT"
+	_apk add --root . --no-scripts syslinux
+	setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT"
 
-if [ "$PARTITION" = yes ]; then
-	dd bs=440 count=1 conv=notrunc if=usr/share/syslinux/gptmbr.bin of="$nbd_dev"
-	sync
+	if [ "$PARTITION" = yes ]; then
+		dd bs=440 count=1 conv=notrunc if=usr/share/syslinux/gptmbr.bin of="$nbd_dev"
+		sync
+	fi
 fi
+
+#-----------------------------------------------------------------------
+einfo 'Configuring system'
 
 cat > etc/fstab <<-EOF
 	# <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
 	UUID=$root_uuid	/		$ROOTFS	relatime	0 1
 EOF
 
-#-----------------------------------------------------------------------
-einfo 'Configuring system'
+if [ "$BOOT_MODE" = 'UEFI' ]; then
+	echo "LABEL=EFI	/boot		vfat\
+	rw,relatime,fmask=0133,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro	0 2" \
+	>> etc/fstab
+
+	# This script is interpreted by UEFI.
+	echo "vmlinuz-$KERNEL_FLAVOR" \
+		"initrd=initramfs-$KERNEL_FLAVOR" \
+		"root=UUID=$root_uuid" \
+		"rootfstype=$ROOTFS" \
+		"modules=$(echo $INITFS_FEATURES | tr ' ' ',')" \
+		${SERIAL_PORT:+"console=ttyS0"} \
+		> boot/startup.nsh
+fi
 
 # We just prepare this config, but don't start the networking service.
 cat > etc/network/interfaces <<-EOF
