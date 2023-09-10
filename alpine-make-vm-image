@@ -513,6 +513,12 @@ if [ -L /etc/apk/cache ]; then
 fi
 
 _apk add --root . --update-cache --initdb alpine-base
+
+# btrfs doesn't use fsck, so we don't have to install btrfs-progs.
+if [ "$ROOTFS" != 'btrfs' ]; then
+	_apk add --root . $(fs_progs_pkg "$ROOTFS")
+fi
+
 prepare_chroot .
 
 #-----------------------------------------------------------------------
