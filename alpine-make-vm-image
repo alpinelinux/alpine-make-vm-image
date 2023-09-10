@@ -580,6 +580,9 @@ rc_add sysinit devfs dmesg mdev hwdrivers
 [ -e etc/init.d/cgroups ] && rc_add sysinit cgroups ||:  # since v3.8
 
 rc_add boot modules hwclock swap hostname sysctl bootmisc syslog
+# urandom was renamed to seedrng in v3.17
+[ -e etc/init.d/seedrng ] && rc_add boot seedrng || rc_add boot urandom
+
 rc_add shutdown killprocs savecache mount-ro
 
 #-----------------------------------------------------------------------
