@@ -95,7 +95,7 @@
 #                                         Default is "--no-progress".
 #
 #   APK_TOOLS_URI                         URL of apk-tools binary to download if $APK is not found
-#                                         on the host system. Default is x86_64 apk.static from
+#                                         on the host system. Default is apk.static from
 #                                         https://gitlab.alpinelinux.org/alpine/apk-tools/-/packages.
 #
 #   APK_TOOLS_SHA256                      SHA-256 checksum of $APK_TOOLS_URI.
@@ -126,9 +126,15 @@ readonly ALPINE_KEYS='
 616ae350:MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAyduVzi1mWm+lYo2Tqt/0\nXkCIWrDNP1QBMVPrE0/ZlU2bCGSoo2Z9FHQKz/mTyMRlhNqTfhJ5qU3U9XlyGOPJ\npiM+b91g26pnpXJ2Q2kOypSgOMOPA4cQ42PkHBEqhuzssfj9t7x47ppS94bboh46\nxLSDRff/NAbtwTpvhStV3URYkxFG++cKGGa5MPXBrxIp+iZf9GnuxVdST5PGiVGP\nODL/b69sPJQNbJHVquqUTOh5Ry8uuD2WZuXfKf7/C0jC/ie9m2+0CttNu9tMciGM\nEyKG1/Xhk5iIWO43m4SrrT2WkFlcZ1z2JSf9Pjm4C2+HovYpihwwdM/OdP8Xmsnr\nDzVB4YvQiW+IHBjStHVuyiZWc+JsgEPJzisNY0Wyc/kNyNtqVKpX6dRhMLanLmy+\nf53cCSI05KPQAcGj6tdL+D60uKDkt+FsDa0BTAobZ31OsFVid0vCXtsbplNhW1IF\nHwsGXBTVcfXg44RLyL8Lk/2dQxDHNHzAUslJXzPxaHBLmt++2COa2EI1iWlvtznk\nOk9WP8SOAIj+xdqoiHcC4j72BOVVgiITIJNHrbppZCq6qPR+fgXmXa+sDcGh30m6\n9Wpbr28kLMSHiENCWTdsFij+NQTd5S47H7XTROHnalYDuF1RpS+DpQidT5tUimaT\nJZDr++FjKrnnijbyNF8b98UCAwEAAQ==
 '
 
-: ${APK_TOOLS_URI:="https://gitlab.alpinelinux.org/api/v4/projects/5/packages/generic/v2.14.0/x86_64/apk.static"}
-: ${APK_TOOLS_SHA256:="1c65115a425d049590bec7c729c7fd88357fbb090a6fc8c31d834d7b0bc7d6f2"}
+readonly HOST_ARCH="$(uname -m)"
 
+# SHA256 checksum of $APK_TOOLS_URI for each architecture.
+case "$HOST_ARCH" in
+	aarch64) : ${APK_TOOLS_SHA256:="d49a63b8b6780fc1342d3e7e14862aa006c30bafbf74beec8e1dfe99e6f89471"};;
+	x86_64) : ${APK_TOOLS_SHA256:="1c65115a425d049590bec7c729c7fd88357fbb090a6fc8c31d834d7b0bc7d6f2"};;
+esac
+
+: ${APK_TOOLS_URI:="https://gitlab.alpinelinux.org/api/v4/projects/5/packages/generic/v2.14.0/$HOST_ARCH/apk.static"}
 : ${APK:="apk"}
 : ${APK_OPTS:="--no-progress"}
 
@@ -436,13 +442,13 @@ case "$ALPINE_BRANCH" in
 	[0-9]*) ALPINE_BRANCH="v$ALPINE_BRANCH";;
 esac
 
-if [ -z "$ARCH" ] || [ "$(uname -m)" = "$ARCH" ]; then
+if [ -z "$ARCH" ] || [ "$HOST_ARCH" = "$ARCH" ]; then
 	: ${KEYS_DIR:="/etc/apk/keys"}
 else
 	: ${KEYS_DIR:=}
 fi
 
-case "${ARCH:-"$(uname -m)"}" in
+case "${ARCH:-"$HOST_ARCH"}" in
 	x86*) : ${BOOT_MODE:="BIOS"}
 	      : ${INITFS_FEATURES:="scsi virtio"};;
 
