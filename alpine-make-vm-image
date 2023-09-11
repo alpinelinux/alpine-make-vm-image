@@ -27,7 +27,13 @@
 #   <script-opts>                         Arguments to pass to the script.
 #
 # Options and Environment Variables:
-#   -B --boot-mode BOOT_MODE              Either "BIOS" (default) or "UEFI".
+#   -a --arch ARCH                        Target CPU architecture. If it doesn't match the host's
+#                                         architecture, you must register an interpreter (emulator)
+#                                         for the target architecture in binfmt, e.g. qemu userspace
+#                                         emulator. Options: x86_64, aarch64 (Alpine v3.18+).
+#
+#   -B --boot-mode BOOT_MODE              Either "BIOS" (default on x86/x86_64) or "UEFI" (default
+#                                         on others). "BIOS" is supported only on x86/x86_64.
 #
 #   -b --branch ALPINE_BRANCH             Alpine branch to install; used only when
 #                                         --repositories-file is not specified. Default is
@@ -40,7 +46,7 @@
 #                                         specified USER:GROUP.
 #
 #   -P --partition (PARTITION)            Create GUID Partition Table (GPT) with a single partition.
-#                                         GPT is always created for --boot-mode UEFI.
+#                                         GPT is always created if --boot-mode is UEFI.
 #
 #   -f --image-format IMAGE_FORMAT        Format of the disk image (see qemu-img --help).
 #
@@ -50,14 +56,15 @@
 #   -i --initfs-features INITFS_FEATURES  List of additional mkinitfs features (basically modules)
 #                                         to be included in initramfs (see mkinitfs -L). "base" and
 #                                         $ROOTFS is always included, don't specify them here.
-#                                         Default is "scsi virtio".
+#                                         Default is "scsi virtio" (and "kms" on non-x86).
 #
 #   -k --kernel-flavor KERNEL_FLAVOR      The kernel flavour to install; virt (default), lts
 #                                         (Alpine >=3.11), or vanilla (Alpine <3.11).
 #
 #      --keys-dir KEYS_DIR                Path of directory with Alpine keys to copy into the image.
-#                                         Default is /etc/apk/keys. If does not exist, keys for
-#                                         x86_64 embedded in this script will be used.
+#                                         Default is /etc/apk/keys if --arch matches the host arch.
+#                                         If does not exist, keys for aarch64 and x86_64 embedded in
+#                                         this script will be used.
 #
 #   -m --mirror-uri ALPINE_MIRROR         URI of the Aports mirror to fetch packages; used only
 #                                         when --repositories-file is not specified. Default is
@@ -110,11 +117,13 @@ readonly VIRTUAL_PKG=".make-$PROGNAME"
 # An opaque string used to detect changes in resolv.conf.
 readonly RESOLVCONF_MARK="### created by $PROGNAME ###"
 
-# Alpine APK keys for verification of packages for x86_64.
+# Alpine APK keys for verification of packages for x86_64 and aarch64.
 readonly ALPINE_KEYS='
 4a6a0840:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1yHJxQgsHQREclQu4Ohe\nqxTxd1tHcNnvnQTu/UrTky8wWvgXT+jpveroeWWnzmsYlDI93eLI2ORakxb3gA2O\nQ0Ry4ws8vhaxLQGC74uQR5+/yYrLuTKydFzuPaS1dK19qJPXB8GMdmFOijnXX4SA\njixuHLe1WW7kZVtjL7nufvpXkWBGjsfrvskdNA/5MfxAeBbqPgaq0QMEfxMAn6/R\nL5kNepi/Vr4S39Xvf2DzWkTLEK8pcnjNkt9/aafhWqFVW7m3HCAII6h/qlQNQKSo\nGuH34Q8GsFG30izUENV9avY7hSLq7nggsvknlNBZtFUcmGoQrtx3FmyYsIC8/R+B\nywIDAQAB
 5261cecb:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwlzMkl7b5PBdfMzGdCT0\ncGloRr5xGgVmsdq5EtJvFkFAiN8Ac9MCFy/vAFmS8/7ZaGOXoCDWbYVLTLOO2qtX\nyHRl+7fJVh2N6qrDDFPmdgCi8NaE+3rITWXGrrQ1spJ0B6HIzTDNEjRKnD4xyg4j\ng01FMcJTU6E+V2JBY45CKN9dWr1JDM/nei/Pf0byBJlMp/mSSfjodykmz4Oe13xB\nCa1WTwgFykKYthoLGYrmo+LKIGpMoeEbY1kuUe04UiDe47l6Oggwnl+8XD1MeRWY\nsWgj8sF4dTcSfCMavK4zHRFFQbGp/YFJ/Ww6U9lA3Vq0wyEI6MCMQnoSMFwrbgZw\nwwIDAQAB
 6165ee59:MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAutQkua2CAig4VFSJ7v54\nALyu/J1WB3oni7qwCZD3veURw7HxpNAj9hR+S5N/pNeZgubQvJWyaPuQDm7PTs1+\ntFGiYNfAsiibX6Rv0wci3M+z2XEVAeR9Vzg6v4qoofDyoTbovn2LztaNEjTkB+oK\ntlvpNhg1zhou0jDVYFniEXvzjckxswHVb8cT0OMTKHALyLPrPOJzVtM9C1ew2Nnc\n3848xLiApMu3NBk0JqfcS3Bo5Y2b1FRVBvdt+2gFoKZix1MnZdAEZ8xQzL/a0YS5\nHd0wj5+EEKHfOd3A75uPa/WQmA+o0cBFfrzm69QDcSJSwGpzWrD1ScH3AK8nWvoj\nv7e9gukK/9yl1b4fQQ00vttwJPSgm9EnfPHLAtgXkRloI27H6/PuLoNvSAMQwuCD\nhQRlyGLPBETKkHeodfLoULjhDi1K2gKJTMhtbnUcAA7nEphkMhPWkBpgFdrH+5z4\nLxy+3ek0cqcI7K68EtrffU8jtUj9LFTUC8dERaIBs7NgQ/LfDbDfGh9g6qVj1hZl\nk9aaIPTm/xsi8v3u+0qaq7KzIBc9s59JOoA8TlpOaYdVgSQhHHLBaahOuAigH+VI\nisbC9vmqsThF2QdDtQt37keuqoda2E6sL7PUvIyVXDRfwX7uMDjlzTxHTymvq2Ck\nhtBqojBnThmjJQFgZXocHG8CAwEAAQ==
+58199dcc:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3v8/ye/V/t5xf4JiXLXa\nhWFRozsnmn3hobON20GdmkrzKzO/eUqPOKTpg2GtvBhK30fu5oY5uN2ORiv2Y2ht\neLiZ9HVz3XP8Fm9frha60B7KNu66FO5P2o3i+E+DWTPqqPcCG6t4Znk2BypILcit\nwiPKTsgbBQR2qo/cO01eLLdt6oOzAaF94NH0656kvRewdo6HG4urbO46tCAizvCR\nCA7KGFMyad8WdKkTjxh8YLDLoOCtoZmXmQAiwfRe9pKXRH/XXGop8SYptLqyVVQ+\ntegOD9wRs2tOlgcLx4F/uMzHN7uoho6okBPiifRX+Pf38Vx+ozXh056tjmdZkCaV\naQIDAQAB
+616ae350:MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAyduVzi1mWm+lYo2Tqt/0\nXkCIWrDNP1QBMVPrE0/ZlU2bCGSoo2Z9FHQKz/mTyMRlhNqTfhJ5qU3U9XlyGOPJ\npiM+b91g26pnpXJ2Q2kOypSgOMOPA4cQ42PkHBEqhuzssfj9t7x47ppS94bboh46\nxLSDRff/NAbtwTpvhStV3URYkxFG++cKGGa5MPXBrxIp+iZf9GnuxVdST5PGiVGP\nODL/b69sPJQNbJHVquqUTOh5Ry8uuD2WZuXfKf7/C0jC/ie9m2+0CttNu9tMciGM\nEyKG1/Xhk5iIWO43m4SrrT2WkFlcZ1z2JSf9Pjm4C2+HovYpihwwdM/OdP8Xmsnr\nDzVB4YvQiW+IHBjStHVuyiZWc+JsgEPJzisNY0Wyc/kNyNtqVKpX6dRhMLanLmy+\nf53cCSI05KPQAcGj6tdL+D60uKDkt+FsDa0BTAobZ31OsFVid0vCXtsbplNhW1IF\nHwsGXBTVcfXg44RLyL8Lk/2dQxDHNHzAUslJXzPxaHBLmt++2COa2EI1iWlvtznk\nOk9WP8SOAIj+xdqoiHcC4j72BOVVgiITIJNHrbppZCq6qPR+fgXmXa+sDcGh30m6\n9Wpbr28kLMSHiENCWTdsFij+NQTd5S47H7XTROHnalYDuF1RpS+DpQidT5tUimaT\nJZDr++FjKrnnijbyNF8b98UCAwEAAQ==
 '
 
 : ${APK_TOOLS_URI:="https://gitlab.alpinelinux.org/api/v4/projects/5/packages/generic/v2.14.0/x86_64/apk.static"}
@@ -374,14 +383,15 @@ wgets() (
 
 #=============================  M a i n  ==============================#
 
-opts=$(getopt -n $PROGNAME -o b:B:cCf:hi:k:m:p:Pr:s:S:tv \
-	-l boot-mode:,branch:,fs-skel-chown:,fs-skel-dir:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,partition,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
+opts=$(getopt -n $PROGNAME -o a:b:B:cCf:hi:k:m:p:Pr:s:S:tv \
+	-l arch:,boot-mode:,branch:,fs-skel-chown:,fs-skel-dir:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,partition,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
 	-- "$@") || help 1 >&2
 
 eval set -- "$opts"
 while [ $# -gt 0 ]; do
 	n=2
 	case "$1" in
+		-a | --arch) ARCH="$2";;
 		-B | --boot-mode) BOOT_MODE="$2";;
 		-b | --branch) ALPINE_BRANCH="$2";;
 		-S | --fs-skel-dir) FS_SKEL_DIR="$(realpath "$2")";;
@@ -408,15 +418,13 @@ done
 
 : ${ALPINE_BRANCH:="latest-stable"}
 : ${ALPINE_MIRROR:="http://dl-cdn.alpinelinux.org/alpine"}
-: ${BOOT_MODE:="BIOS"}
+: ${ARCH:=}
 : ${CLEANUP:="yes"}
 : ${FS_SKEL_CHOWN:=}
 : ${FS_SKEL_DIR:=}
 : ${IMAGE_FORMAT:=}
 : ${IMAGE_SIZE:="2G"}
-: ${INITFS_FEATURES:="scsi virtio"}
 : ${KERNEL_FLAVOR:="virt"}
-: ${KEYS_DIR:="/etc/apk/keys"}
 : ${PACKAGES:=}
 : ${PARTITION:="no"}
 : ${REPOS_FILE:=}
@@ -426,6 +434,22 @@ done
 
 case "$ALPINE_BRANCH" in
 	[0-9]*) ALPINE_BRANCH="v$ALPINE_BRANCH";;
+esac
+
+if [ -z "$ARCH" ] || [ "$(uname -m)" = "$ARCH" ]; then
+	: ${KEYS_DIR:="/etc/apk/keys"}
+else
+	: ${KEYS_DIR:=}
+fi
+
+case "${ARCH:-"$(uname -m)"}" in
+	x86*) : ${BOOT_MODE:="BIOS"}
+	      : ${INITFS_FEATURES:="scsi virtio"};;
+
+	*)    : ${BOOT_MODE:="UEFI"}
+	      # kms includes virtio-gpu drivers needed for graphical output.
+	      : ${INITFS_FEATURES:="kms scsi virtio"}
+	      [ "$BOOT_MODE" = 'BIOS' ] && die 'BIOS boot mode is supported only on x86/x86_64';;
 esac
 
 case "$BOOT_MODE" in
@@ -557,7 +581,7 @@ if [ -L /etc/apk/cache ]; then
 	ln -s "$(realpath /etc/apk/cache)" etc/apk/cache
 fi
 
-_apk add --root . --update-cache --initdb alpine-base
+_apk add --root . ${ARCH:+--arch "$ARCH"} --update-cache --initdb alpine-base
 
 fsprogs_pkgs=
 # btrfs doesn't use fsck, so we don't have to install btrfs-progs.
@@ -610,12 +634,15 @@ if [ "$BOOT_MODE" = 'UEFI' ]; then
 	>> etc/fstab
 
 	# This script is interpreted by UEFI.
+	# NOTE: When console=$SERIAL_PORT is added here, no messages are printed to
+	#  console on QEMU after switch_root. 'console=tty0' must be explicitly set
+	#  for aarch64 (it's the default on x86_64).
 	echo "vmlinuz-$KERNEL_FLAVOR" \
 		"initrd=initramfs-$KERNEL_FLAVOR" \
 		"root=UUID=$root_uuid" \
 		"rootfstype=$ROOTFS" \
 		"modules=$(echo $INITFS_FEATURES | tr ' ' ',')" \
-		${SERIAL_PORT:+"console=ttyS0"} \
+		'console=tty0' \
 		> boot/startup.nsh
 fi
 

@@ -4,7 +4,7 @@ on:
   - push
 
 jobs:
-  test:
+  test-x86_64:
     runs-on: ubuntu-latest
     steps:
       - name: Install qemu-utils
@@ -51,3 +51,31 @@ jobs:
               --fs-skel-chown root:root \
               --script-chroot \
               alpine-uefi-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh
+
+  test-aarch64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install qemu-utils
+        run: |
+          sudo apt-get update
+          sudo apt-get install qemu-utils
+
+      - uses: actions/checkout@v3
+
+      # This installs qemu userspace emulator and registers in binfmt.
+      - uses: jirutka/setup-alpine@v1
+        with:
+          arch: aarch64
+
+      - name: Build image for aarch64 on x86_64 host
+        run: |
+          sudo ./alpine-make-vm-image \
+              --image-format qcow2 \
+              --image-size 2G \
+              --arch aarch64 \
+              --repositories-file example/repositories \
+              --packages "$(cat example/packages)" \
+              --fs-skel-dir example/rootfs \
+              --fs-skel-chown root:root \
+              --script-chroot \
+              alpine-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh

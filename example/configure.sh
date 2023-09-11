@@ -6,6 +6,7 @@ step() {
 	printf '\n\033[1;36m%d) %s\033[0m\n' $_step_counter "$@" >&2  # bold cyan
 }
 
+uname -a
 
 step 'Set up timezone'
 setup-timezone -z Europe/Prague
