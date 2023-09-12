@@ -47,9 +47,45 @@ wget https://raw.githubusercontent.com/{gh-name}/v{version}/{script-name} \
 Or, if you are on Alpine Linux, you can simply install the https://pkgs.alpinelinux.org/packages?name={script-name}[{script-name}] package.
 
 
-== Pitfalls
+== Howtos
 
-=== Creating Image for VMware (ESXi)
+=== Create images for aarch64 on x86_64 host
+
+All you need to do is install the https://www.qemu.org/docs/master/user/main.html[QEMU User space emulator] for aarch64 and register it in https://docs.kernel.org/admin-guide/binfmt-misc.html[binfmt_misc] as the interpreter for aarch64 binaries.
+
+On Alpine Linux::
++
+[source, sh]
+apk add qemu-aarch64 qemu-openrc
+rc-service qemu-binfmt start
+
+On Debian/Ubuntu::
++
+[source, sh]
+apt-get install -y --no-install-recommends binfmt-support qemu-user-static
+update-binfmts --enable
+
+On Fedora::
++
+[source, sh]
+dnf install qemu-user-static
+
+On GitHub Actions::
++
+[source, yaml]
+----
+- name: Install qemu-aarch64 and register in binfmt
+  uses: jirutka/setup-alpine@v1
+  with:
+    arch: aarch64
+----
++
+See link:.github/workflows/ci.yml[] for a complete example.
+
+After that, run {script-name} with the option `--arch aarch64`.
+
+
+=== Create image for VMware (ESXi)
 
 VMware and disk images (virtual disks) is one big mess.
 You can find that VMware uses the VMDK format, but the problem is that this is not a single format.
