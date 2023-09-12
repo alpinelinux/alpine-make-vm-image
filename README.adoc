@@ -22,14 +22,14 @@ TIP: Don’t need VM, just wanna chroot into Alpine Linux?
 
 * Linux system with common userland (Busybox or GNU coreutils)
 * POSIX-sh compatible shell (e.g. Busybox ash, dash, Bash, ZSH)
-* qemu-img and qemu-nbd
-* rsync (needed only for `--fs-skel-dir`)
-* sfdisk (needed only for `--partition`, `--boot-mode UEFI` and non-x86 architectures)
-* mdev or udevadm (needed only for `--partition`, `--boot-mode UEFI` and non-x86 architectures if device hotplug doesn’t work)
-* e2fsprogs (for ext4), btrfs-progs (for Btrfs), or xfsprogs (for XFS)
-* dosfstools (needed only for `--boot-mode UEFI` and non-x86 architectures)
+* `qemu-img` and `qemu-nbd` tools
+* `rsync` (needed only for `--fs-skel-dir`)
+* `sfdisk` (needed only for `--partition`, `--boot-mode UEFI` and non-x86 architectures)
+* `mdev` or `udevadm` (needed only for `--partition`, `--boot-mode UEFI` and non-x86 architectures if device hotplug doesn’t work)
+* `e2fsprogs` (for ext4), `btrfs-progs` (for Btrfs), or `xfsprogs` (for XFS)
+* `dosfstools` (needed only for `--boot-mode UEFI` and non-x86 architectures)
 
-All dependencies except the first two are automatically installed by the script when running on Alpine.
+All dependencies except the first two are automatically installed by the script when running on Alpine Linux.
 
 
 == Usage
