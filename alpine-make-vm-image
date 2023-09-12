@@ -56,7 +56,7 @@
 #   -i --initfs-features INITFS_FEATURES  List of additional mkinitfs features (basically modules)
 #                                         to be included in initramfs (see mkinitfs -L). "base" and
 #                                         $ROOTFS is always included, don't specify them here.
-#                                         Default is "scsi virtio" (and "kms" on non-x86).
+#                                         Default is "kms scsi virtio".
 #
 #   -k --kernel-flavor KERNEL_FLAVOR      The kernel flavour to install; virt (default), lts
 #                                         (Alpine >=3.11), or vanilla (Alpine <3.11).
@@ -430,6 +430,9 @@ done
 : ${FS_SKEL_DIR:=}
 : ${IMAGE_FORMAT:=}
 : ${IMAGE_SIZE:="2G"}
+# kms includes virtio-gpu drivers used for graphical output. This is needed
+# for aarch64 where '-vga std' is not supported, but useful even for x86_64.
+: ${INITFS_FEATURES:="kms scsi virtio"}
 : ${KERNEL_FLAVOR:="virt"}
 : ${PACKAGES:=}
 : ${PARTITION:="no"}
@@ -449,12 +452,8 @@ else
 fi
 
 case "${ARCH:-"$HOST_ARCH"}" in
-	x86*) : ${BOOT_MODE:="BIOS"}
-	      : ${INITFS_FEATURES:="scsi virtio"};;
-
+	x86*) : ${BOOT_MODE:="BIOS"};;
 	*)    : ${BOOT_MODE:="UEFI"}
-	      # kms includes virtio-gpu drivers needed for graphical output.
-	      : ${INITFS_FEATURES:="kms scsi virtio"}
 	      [ "$BOOT_MODE" = 'BIOS' ] && die 'BIOS boot mode is supported only on x86/x86_64';;
 esac
 
