@@ -121,9 +121,9 @@ jobs:
         run: |
           ./alpine-make-vm-image \
               --arch aarch64 \
+              --branch edge \
               --image-format qcow2 \
               --image-size 2G \
-              --repositories-file example/repositories \
               --packages "$(cat example/packages)" \
               --fs-skel-dir example/rootfs \
               --fs-skel-chown root:root \
