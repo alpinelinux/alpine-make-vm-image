@@ -30,7 +30,7 @@
 #   -a --arch ARCH                        Target CPU architecture. If it doesn't match the host's
 #                                         architecture, you must register an interpreter (emulator)
 #                                         for the target architecture in binfmt, e.g. qemu userspace
-#                                         emulator. Options: x86_64, aarch64 (Alpine v3.18+).
+#                                         emulator. Options: x86_64, aarch64 (Alpine v3.19+ / edge).
 #
 #   -B --boot-mode BOOT_MODE              Either "BIOS" (default on x86/x86_64) or "UEFI" (default
 #                                         on others). "BIOS" is supported only on x86/x86_64.

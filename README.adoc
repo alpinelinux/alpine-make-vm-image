@@ -17,6 +17,8 @@ TIP: Don’t need VM, just wanna chroot into Alpine Linux?
      Or do you want to create a custom rootfs?
      Then https://github.com/alpinelinux/alpine-make-rootfs[alpine-make-rootfs] is for you!
 
+IMPORTANT: aarch64 currently only works with the kernel (linux-virt or linux-lts) from Alpine edge! See https://gitlab.alpinelinux.org/alpine/aports/-/issues/15263[alpine/aports#15263] for more information.
+
 
 == Requirements
 
