@@ -1,15 +1,18 @@
 = Make Alpine Linux VM Image
 :script-name: alpine-make-vm-image
-:script-sha1: 88b64032dd8d6988f1262267a0a0de2e63a27ae4
+:script-sha1: 75aafcb883155bcaad9ad0dadb3e22e082152c1e
 :gh-name: alpinelinux/{script-name}
-:version: 0.11.0
+:version: 0.12.0
 
 ifdef::env-github[]
 image:https://github.com/{gh-name}/workflows/CI/badge.svg["Build Status", link="https://github.com/{gh-name}/actions"]
 endif::env-github[]
 
-This project provides a script for making customized https://alpinelinux.org/[Alpine Linux] disk images for virtual machines.
-It’s quite simple (300 LoC of shell), fast (~32 seconds on GitHub Actions) and requires minimum dependencies (QEMU and filesystem tools).
+This project provides a script for making customized https://alpinelinux.org/[Alpine Linux] disk images for x86_64 and aarch64 virtual machines.
+You can choose between BIOS mode (using https://syslinux.org/[Syslinux], only for x86_64) and UEFI mode (using Linux https://docs.kernel.org/admin-guide/efi-stub.html[EFI stub]).
+It’s quite simple (400 LoC of shell), fast (~32 seconds on GitHub Actions), requires minimum dependencies (QEMU and filesystem tools).
+
+IMPORTANT: aarch64 currently only works with the kernel (linux-virt or linux-lts) from Alpine edge! See <<aarch64-v3.18>> for more information and a workaround.
 
 TIP: Don’t need VM, just wanna chroot into Alpine Linux?
      Try https://github.com/alpinelinux/alpine-chroot-install[alpine-chroot-install]!
@@ -21,12 +24,14 @@ TIP: Don’t need VM, just wanna chroot into Alpine Linux?
 
 * Linux system with common userland (Busybox or GNU coreutils)
 * POSIX-sh compatible shell (e.g. Busybox ash, dash, Bash, ZSH)
-* qemu-img and qemu-nbd
-* rsync (needed only for `--fs-skel-dir`)
-* sfdisk (needed only for `--partition`)
-* e2fsprogs (for ext4), btrfs-progs (for Btrfs), or xfsprogs (for XFS)
+* `qemu-img` and `qemu-nbd` tools
+* `rsync` (needed only for `--fs-skel-dir`)
+* `sfdisk` (needed only for `--partition`, `--boot-mode UEFI` and non-x86 architectures)
+* `mdev` or `udevadm` (needed only for `--partition`, `--boot-mode UEFI` and non-x86 architectures if device hotplug doesn’t work)
+* `e2fsprogs` (for ext4), `btrfs-progs` (for Btrfs), or `xfsprogs` (for XFS)
+* `dosfstools` (needed only for `--boot-mode UEFI` and non-x86 architectures)
 
-All dependencies except the first two are automatically installed by the script when running on Alpine.
+All dependencies except the first two are automatically installed by the script when running on Alpine Linux.
 
 
 == Usage
@@ -44,9 +49,68 @@ wget https://raw.githubusercontent.com/{gh-name}/v{version}/{script-name} \
 Or, if you are on Alpine Linux, you can simply install the https://pkgs.alpinelinux.org/packages?name={script-name}[{script-name}] package.
 
 
-== Pitfalls
+== Howtos
 
-=== Creating Image for VMware (ESXi)
+[[aarch64-v3.18]]
+=== Create Alpine v3.18 (latest-stable) image for aarch64
+
+The Linux kernel (_linux-virt_, _linux-lts_ or _linux-edge_ package) in Alpine v3.18 and earlier doesn’t have https://cateee.net/lkddb/web-lkddb/EFI_ZBOOT.html[EFI_ZBOOT] enabled, so EFI stub cannot load a compressed vmlinuz.
+We backported it to v3.18, but then we had to revert it due to a problem with Grub (see https://gitlab.alpinelinux.org/alpine/aports/-/issues/15263[alpine/aports#15263]).
+
+If you want to build an image with a stable branch of Alpine Linux, you can, but you must install the kernel from the edge branch.
+This is relatively safe because the kernel package doesn’t have any dynamic dependencies and the version in v3.18 and edge will be in sync at least until v3.19 is released.
+
+. Create a `repositories` file with a pinned main repository from edge, e.g.:
++
+[source]
+----
+@edge https://dl-cdn.alpinelinux.org/alpine/edge/main
+https://dl-cdn.alpinelinux.org/alpine/v3.18/main
+https://dl-cdn.alpinelinux.org/alpine/v3.18/community
+----
+
+. Run {script-name} with the options `--repositories-file ./repositories` and `--packages linux-virt@edge` (or `linux-lts@edge` if you use `--kernel-flavor lts`).
+
+This will first install _linux-virt_ from v3.18, but in the later step it will reinstall it from the edge branch.
+
+
+=== Create images for aarch64 on x86_64 host
+
+All you need to do is install the https://www.qemu.org/docs/master/user/main.html[QEMU User space emulator] for aarch64 and register it in https://docs.kernel.org/admin-guide/binfmt-misc.html[binfmt_misc] as the interpreter for aarch64 binaries.
+
+On Alpine Linux::
++
+[source, sh]
+apk add qemu-aarch64 qemu-openrc
+rc-service qemu-binfmt start
+
+On Debian/Ubuntu::
++
+[source, sh]
+apt-get install -y --no-install-recommends binfmt-support qemu-user-static
+update-binfmts --enable
+
+On Fedora::
++
+[source, sh]
+dnf install qemu-user-static
+
+On GitHub Actions::
++
+[source, yaml]
+----
+- name: Install qemu-aarch64 and register in binfmt
+  uses: jirutka/setup-alpine@v1
+  with:
+    arch: aarch64
+----
++
+See link:.github/workflows/ci.yml[] for a complete example.
+
+After that, run {script-name} with the option `--arch aarch64`.
+
+
+=== Create image for VMware (ESXi)
 
 VMware and disk images (virtual disks) is one big mess.
 You can find that VMware uses the VMDK format, but the problem is that this is not a single format.

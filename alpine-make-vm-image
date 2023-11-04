@@ -8,16 +8,19 @@
 # This script creates a bootable Alpine Linux disk image for virtual machines.
 # If running on Alpine system (detected by file /etc/alpine-release), then it
 # also installs needed packages on the host system. On other systems you must
-# install them yourself: qemu-img, qemu-nbd, rsync, sfdisk, and mkfs utility
-# for the chosen ROOTFS. If $APK is not available on the host system, then
-# static apk-tools specified by $APK_TOOLS_URI is downloaded and used.
+# install them yourself: qemu-img, qemu-nbd, rsync, sfdisk, dosfstools (for UEFI
+# mode) and mkfs utility for the chosen ROOTFS. If $APK is not available on the
+# host system, then static apk-tools specified by $APK_TOOLS_URI is downloaded
+# and used.
 #
-# Note that it does not create any partitions by default (it's really not
-# needed), filesystem is created directly on the image. If you must use some
-# platform that foolishly requires partitions in images, use --partition.
+# Note that in BIOS mode, it does not create any partitions by default (it's
+# really not needed), filesystem is created directly on the image. If you must
+# use some platform that foolishly requires partitions in images, use
+# --partition.
 #
 # Arguments:
-#   <image>                               Path of disk image to use or create if not exists.
+#   <image>                               Path of block device or disk image file to use or create
+#                                         if it does not exist.
 #
 #   <script>                              Path of script to execute after installing base system in
 #                                         the mounted image and before umounting it.
@@ -25,6 +28,14 @@
 #   <script-opts>                         Arguments to pass to the script.
 #
 # Options and Environment Variables:
+#   -a --arch ARCH                        Target CPU architecture. If it doesn't match the host's
+#                                         architecture, you must register an interpreter (emulator)
+#                                         for the target architecture in binfmt, e.g. qemu userspace
+#                                         emulator. Options: x86_64, aarch64 (Alpine v3.19+ / edge).
+#
+#   -B --boot-mode BOOT_MODE              Either "BIOS" (default on x86/x86_64) or "UEFI" (default
+#                                         on others). "BIOS" is supported only on x86/x86_64.
+#
 #   -b --branch ALPINE_BRANCH             Alpine branch to install; used only when
 #                                         --repositories-file is not specified. Default is
 #                                         latest-stable.
@@ -36,23 +47,27 @@
 #                                         specified USER:GROUP.
 #
 #   -P --partition (PARTITION)            Create GUID Partition Table (GPT) with a single partition.
+#                                         GPT is always created if --boot-mode is UEFI.
 #
-#   -f --image-format IMAGE_FORMAT        Format of the disk image (see qemu-img --help).
+#   -f --image-format IMAGE_FORMAT        Format of the disk image (see qemu-img --help). Not
+#                                         applicable if the target image is a block device.
 #
 #   -s --image-size IMAGE_SIZE            Size of the disk image to create in bytes or with suffix
-#                                         (e.g. 1G, 1024M). Default is 2G.
+#                                         (e.g. 1G, 1024M). Default is 2G. Not applicable if the
+#                                         target image is a block device.
 #
 #   -i --initfs-features INITFS_FEATURES  List of additional mkinitfs features (basically modules)
 #                                         to be included in initramfs (see mkinitfs -L). "base" and
 #                                         $ROOTFS is always included, don't specify them here.
-#                                         Default is "scsi virtio".
+#                                         Default is "kms scsi virtio".
 #
 #   -k --kernel-flavor KERNEL_FLAVOR      The kernel flavour to install; virt (default), lts
 #                                         (Alpine >=3.11), or vanilla (Alpine <3.11).
 #
 #      --keys-dir KEYS_DIR                Path of directory with Alpine keys to copy into the image.
-#                                         Default is /etc/apk/keys. If does not exist, keys for
-#                                         x86_64 embedded in this script will be used.
+#                                         Default is /etc/apk/keys if --arch matches the host arch.
+#                                         If does not exist, keys for aarch64 and x86_64 embedded in
+#                                         this script will be used.
 #
 #   -m --mirror-uri ALPINE_MIRROR         URI of the Aports mirror to fetch packages; used only
 #                                         when --repositories-file is not specified. Default is
@@ -83,7 +98,7 @@
 #                                         Default is "--no-progress".
 #
 #   APK_TOOLS_URI                         URL of apk-tools binary to download if $APK is not found
-#                                         on the host system. Default is x86_64 apk.static from
+#                                         on the host system. Default is apk.static from
 #                                         https://gitlab.alpinelinux.org/alpine/apk-tools/-/packages.
 #
 #   APK_TOOLS_SHA256                      SHA-256 checksum of $APK_TOOLS_URI.
@@ -100,21 +115,29 @@ set -eu
 PATH="$PATH:/usr/sbin:/usr/bin:/sbin:/bin"
 
 readonly PROGNAME='alpine-make-vm-image'
-readonly VERSION='0.11.0'
+readonly VERSION='0.12.0'
 readonly VIRTUAL_PKG=".make-$PROGNAME"
 # An opaque string used to detect changes in resolv.conf.
 readonly RESOLVCONF_MARK="### created by $PROGNAME ###"
 
-# Alpine APK keys for verification of packages for x86_64.
+# Alpine APK keys for verification of packages for x86_64 and aarch64.
 readonly ALPINE_KEYS='
-alpine-devel@lists.alpinelinux.org-4a6a0840.rsa.pub:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1yHJxQgsHQREclQu4Ohe\nqxTxd1tHcNnvnQTu/UrTky8wWvgXT+jpveroeWWnzmsYlDI93eLI2ORakxb3gA2O\nQ0Ry4ws8vhaxLQGC74uQR5+/yYrLuTKydFzuPaS1dK19qJPXB8GMdmFOijnXX4SA\njixuHLe1WW7kZVtjL7nufvpXkWBGjsfrvskdNA/5MfxAeBbqPgaq0QMEfxMAn6/R\nL5kNepi/Vr4S39Xvf2DzWkTLEK8pcnjNkt9/aafhWqFVW7m3HCAII6h/qlQNQKSo\nGuH34Q8GsFG30izUENV9avY7hSLq7nggsvknlNBZtFUcmGoQrtx3FmyYsIC8/R+B\nywIDAQAB
-alpine-devel@lists.alpinelinux.org-5261cecb.rsa.pub:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwlzMkl7b5PBdfMzGdCT0\ncGloRr5xGgVmsdq5EtJvFkFAiN8Ac9MCFy/vAFmS8/7ZaGOXoCDWbYVLTLOO2qtX\nyHRl+7fJVh2N6qrDDFPmdgCi8NaE+3rITWXGrrQ1spJ0B6HIzTDNEjRKnD4xyg4j\ng01FMcJTU6E+V2JBY45CKN9dWr1JDM/nei/Pf0byBJlMp/mSSfjodykmz4Oe13xB\nCa1WTwgFykKYthoLGYrmo+LKIGpMoeEbY1kuUe04UiDe47l6Oggwnl+8XD1MeRWY\nsWgj8sF4dTcSfCMavK4zHRFFQbGp/YFJ/Ww6U9lA3Vq0wyEI6MCMQnoSMFwrbgZw\nwwIDAQAB
-alpine-devel@lists.alpinelinux.org-6165ee59.rsa.pub:MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAutQkua2CAig4VFSJ7v54\nALyu/J1WB3oni7qwCZD3veURw7HxpNAj9hR+S5N/pNeZgubQvJWyaPuQDm7PTs1+\ntFGiYNfAsiibX6Rv0wci3M+z2XEVAeR9Vzg6v4qoofDyoTbovn2LztaNEjTkB+oK\ntlvpNhg1zhou0jDVYFniEXvzjckxswHVb8cT0OMTKHALyLPrPOJzVtM9C1ew2Nnc\n3848xLiApMu3NBk0JqfcS3Bo5Y2b1FRVBvdt+2gFoKZix1MnZdAEZ8xQzL/a0YS5\nHd0wj5+EEKHfOd3A75uPa/WQmA+o0cBFfrzm69QDcSJSwGpzWrD1ScH3AK8nWvoj\nv7e9gukK/9yl1b4fQQ00vttwJPSgm9EnfPHLAtgXkRloI27H6/PuLoNvSAMQwuCD\nhQRlyGLPBETKkHeodfLoULjhDi1K2gKJTMhtbnUcAA7nEphkMhPWkBpgFdrH+5z4\nLxy+3ek0cqcI7K68EtrffU8jtUj9LFTUC8dERaIBs7NgQ/LfDbDfGh9g6qVj1hZl\nk9aaIPTm/xsi8v3u+0qaq7KzIBc9s59JOoA8TlpOaYdVgSQhHHLBaahOuAigH+VI\nisbC9vmqsThF2QdDtQt37keuqoda2E6sL7PUvIyVXDRfwX7uMDjlzTxHTymvq2Ck\nhtBqojBnThmjJQFgZXocHG8CAwEAAQ==
+4a6a0840:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1yHJxQgsHQREclQu4Ohe\nqxTxd1tHcNnvnQTu/UrTky8wWvgXT+jpveroeWWnzmsYlDI93eLI2ORakxb3gA2O\nQ0Ry4ws8vhaxLQGC74uQR5+/yYrLuTKydFzuPaS1dK19qJPXB8GMdmFOijnXX4SA\njixuHLe1WW7kZVtjL7nufvpXkWBGjsfrvskdNA/5MfxAeBbqPgaq0QMEfxMAn6/R\nL5kNepi/Vr4S39Xvf2DzWkTLEK8pcnjNkt9/aafhWqFVW7m3HCAII6h/qlQNQKSo\nGuH34Q8GsFG30izUENV9avY7hSLq7nggsvknlNBZtFUcmGoQrtx3FmyYsIC8/R+B\nywIDAQAB
+5261cecb:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwlzMkl7b5PBdfMzGdCT0\ncGloRr5xGgVmsdq5EtJvFkFAiN8Ac9MCFy/vAFmS8/7ZaGOXoCDWbYVLTLOO2qtX\nyHRl+7fJVh2N6qrDDFPmdgCi8NaE+3rITWXGrrQ1spJ0B6HIzTDNEjRKnD4xyg4j\ng01FMcJTU6E+V2JBY45CKN9dWr1JDM/nei/Pf0byBJlMp/mSSfjodykmz4Oe13xB\nCa1WTwgFykKYthoLGYrmo+LKIGpMoeEbY1kuUe04UiDe47l6Oggwnl+8XD1MeRWY\nsWgj8sF4dTcSfCMavK4zHRFFQbGp/YFJ/Ww6U9lA3Vq0wyEI6MCMQnoSMFwrbgZw\nwwIDAQAB
+6165ee59:MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAutQkua2CAig4VFSJ7v54\nALyu/J1WB3oni7qwCZD3veURw7HxpNAj9hR+S5N/pNeZgubQvJWyaPuQDm7PTs1+\ntFGiYNfAsiibX6Rv0wci3M+z2XEVAeR9Vzg6v4qoofDyoTbovn2LztaNEjTkB+oK\ntlvpNhg1zhou0jDVYFniEXvzjckxswHVb8cT0OMTKHALyLPrPOJzVtM9C1ew2Nnc\n3848xLiApMu3NBk0JqfcS3Bo5Y2b1FRVBvdt+2gFoKZix1MnZdAEZ8xQzL/a0YS5\nHd0wj5+EEKHfOd3A75uPa/WQmA+o0cBFfrzm69QDcSJSwGpzWrD1ScH3AK8nWvoj\nv7e9gukK/9yl1b4fQQ00vttwJPSgm9EnfPHLAtgXkRloI27H6/PuLoNvSAMQwuCD\nhQRlyGLPBETKkHeodfLoULjhDi1K2gKJTMhtbnUcAA7nEphkMhPWkBpgFdrH+5z4\nLxy+3ek0cqcI7K68EtrffU8jtUj9LFTUC8dERaIBs7NgQ/LfDbDfGh9g6qVj1hZl\nk9aaIPTm/xsi8v3u+0qaq7KzIBc9s59JOoA8TlpOaYdVgSQhHHLBaahOuAigH+VI\nisbC9vmqsThF2QdDtQt37keuqoda2E6sL7PUvIyVXDRfwX7uMDjlzTxHTymvq2Ck\nhtBqojBnThmjJQFgZXocHG8CAwEAAQ==
+58199dcc:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3v8/ye/V/t5xf4JiXLXa\nhWFRozsnmn3hobON20GdmkrzKzO/eUqPOKTpg2GtvBhK30fu5oY5uN2ORiv2Y2ht\neLiZ9HVz3XP8Fm9frha60B7KNu66FO5P2o3i+E+DWTPqqPcCG6t4Znk2BypILcit\nwiPKTsgbBQR2qo/cO01eLLdt6oOzAaF94NH0656kvRewdo6HG4urbO46tCAizvCR\nCA7KGFMyad8WdKkTjxh8YLDLoOCtoZmXmQAiwfRe9pKXRH/XXGop8SYptLqyVVQ+\ntegOD9wRs2tOlgcLx4F/uMzHN7uoho6okBPiifRX+Pf38Vx+ozXh056tjmdZkCaV\naQIDAQAB
+616ae350:MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAyduVzi1mWm+lYo2Tqt/0\nXkCIWrDNP1QBMVPrE0/ZlU2bCGSoo2Z9FHQKz/mTyMRlhNqTfhJ5qU3U9XlyGOPJ\npiM+b91g26pnpXJ2Q2kOypSgOMOPA4cQ42PkHBEqhuzssfj9t7x47ppS94bboh46\nxLSDRff/NAbtwTpvhStV3URYkxFG++cKGGa5MPXBrxIp+iZf9GnuxVdST5PGiVGP\nODL/b69sPJQNbJHVquqUTOh5Ry8uuD2WZuXfKf7/C0jC/ie9m2+0CttNu9tMciGM\nEyKG1/Xhk5iIWO43m4SrrT2WkFlcZ1z2JSf9Pjm4C2+HovYpihwwdM/OdP8Xmsnr\nDzVB4YvQiW+IHBjStHVuyiZWc+JsgEPJzisNY0Wyc/kNyNtqVKpX6dRhMLanLmy+\nf53cCSI05KPQAcGj6tdL+D60uKDkt+FsDa0BTAobZ31OsFVid0vCXtsbplNhW1IF\nHwsGXBTVcfXg44RLyL8Lk/2dQxDHNHzAUslJXzPxaHBLmt++2COa2EI1iWlvtznk\nOk9WP8SOAIj+xdqoiHcC4j72BOVVgiITIJNHrbppZCq6qPR+fgXmXa+sDcGh30m6\n9Wpbr28kLMSHiENCWTdsFij+NQTd5S47H7XTROHnalYDuF1RpS+DpQidT5tUimaT\nJZDr++FjKrnnijbyNF8b98UCAwEAAQ==
 '
 
-: ${APK_TOOLS_URI:="https://gitlab.alpinelinux.org/api/v4/projects/5/packages/generic/v2.12.10/x86_64/apk.static"}
-: ${APK_TOOLS_SHA256:="d7506bb11327b337960910daffed75aa289d8bb350feab624c52965be82ceae8"}
+readonly HOST_ARCH="$(uname -m)"
 
+# SHA256 checksum of $APK_TOOLS_URI for each architecture.
+case "$HOST_ARCH" in
+	aarch64) : ${APK_TOOLS_SHA256:="d49a63b8b6780fc1342d3e7e14862aa006c30bafbf74beec8e1dfe99e6f89471"};;
+	x86_64) : ${APK_TOOLS_SHA256:="1c65115a425d049590bec7c729c7fd88357fbb090a6fc8c31d834d7b0bc7d6f2"};;
+esac
+
+: ${APK_TOOLS_URI:="https://gitlab.alpinelinux.org/api/v4/projects/5/packages/generic/v2.14.0/$HOST_ARCH/apk.static"}
 : ${APK:="apk"}
 : ${APK_OPTS:="--no-progress"}
 
@@ -150,12 +173,12 @@ cleanup() {
 	fi
 	if [ "$mount_dir" ]; then
 		umount_recursively "$mount_dir" \
-			|| die "Failed to unmount $mount_dir; unmount it and disconnect $nbd_dev manually"
+			|| die "Failed to unmount $mount_dir; unmount it and disconnect $disk_dev manually"
 		rm -Rf "$mount_dir"
 	fi
-	if [ "$nbd_dev" ]; then
-		qemu-nbd --disconnect "$nbd_dev" \
-			|| die "Failed to disconnect $nbd_dev; disconnect it manually"
+	if [ "$disk_dev" ] && ! [ -b "$IMAGE_FILE" ]; then
+		qemu-nbd --disconnect "$disk_dev" \
+			|| die "Failed to disconnect $disk_dev; disconnect it manually"
 	fi
 	if [ "$INSTALL_HOST_PKGS" = yes ]; then
 		_apk del $VIRTUAL_PKG
@@ -170,37 +193,56 @@ _apk() {
 attach_image() {
 	local image="$1"
 	local format="${2:-}"
-	local nbd_dev
+	local disk_dev
 
-	nbd_dev=$(get_available_nbd) || {
+	disk_dev=$(get_available_nbd) || {
 		modprobe nbd max_part=16
 		sleep 1
-		nbd_dev=$(get_available_nbd)
+		disk_dev=$(get_available_nbd)
 	} || die 'No available nbd device found!'
 
-	qemu-nbd --connect="$nbd_dev" --cache=writeback \
+	qemu-nbd --connect="$disk_dev" --cache=writeback \
 		${format:+--format=$format} "$image" \
-		&& echo "$nbd_dev"
+		&& echo "$disk_dev"
 }
 
 # Prints UUID of filesystem on the specified block device.
 blk_uuid() {
 	local dev="$1"
-	blkid "$dev" | sed -En 's/.*UUID="([^"]+)".*/\1/p'
+	blkid "$dev" | sed -En 's/.*\bUUID="([^"]+)".*/\1/p'
+}
+
+# Creates GPT parition table on the device $1 for boot mode $2 (BIOS or UEFI).
+create_gpt() {
+	local dev="$1"
+	local mode="$2"
+
+	case "$mode" in
+		BIOS) printf '%s\n' \
+			'label: gpt' \
+			'name=system,type=L,bootable,attrs=LegacyBIOSBootable' \
+			| sfdisk "$dev" ;;
+		UEFI) printf '%s\n' \
+			'label: gpt' \
+			'name=efi,type=U,size=128M,bootable' \
+			'name=system,type=L' \
+			| sfdisk "$disk_dev" ;;
+		*) die "Invalid mode: $mode" ;;
+	esac
 }
 
 # Writes Alpine APK keys embedded in this script into directory $1.
 dump_alpine_keys() {
 	local dest_dir="$1"
-	local content file line
+	local content id line
 
 	mkdir -p "$dest_dir"
 	for line in $ALPINE_KEYS; do
-		file=${line%%:*}
+		id=${line%%:*}
 		content=${line#*:}
 
 		printf -- "-----BEGIN PUBLIC KEY-----\n$content\n-----END PUBLIC KEY-----\n" \
-			> "$dest_dir/$file"
+			> "$dest_dir/alpine-devel@lists.alpinelinux.org-$id.rsa.pub"
 	done
 }
 
@@ -223,6 +265,11 @@ fs_progs_pkg() {
 		btrfs) echo 'btrfs-progs';;
 		xfs) echo 'xfsprogs';;
 	esac
+}
+
+# Tests if the specified command exists on the system.
+has_cmd() {
+	command -v "$1" >/dev/null
 }
 
 # Binds the directory $1 at the mountpoint $2 and sets propagation to private.
@@ -260,6 +307,25 @@ rc_add() {
 		ln -s /etc/init.d/$svc etc/runlevels/$runlevel/$svc
 		echo " * service $svc added to runlevel $runlevel"
 	done
+}
+
+# Ensures that the specified device node exists.
+settle_dev_node() {
+	local dev="$1"
+
+	[ -e "$dev" ] && return 0
+
+	sleep 1  # give hotplug handler some time to kick in
+	[ -e "$dev" ] && return 0
+
+	if has_cmd udevadm; then
+		udevadm settle --exit-if-exists="$dev"
+	elif has_cmd mdev; then
+		mdev -s
+	fi
+	[ -e "$dev" ] && return 0
+
+	return 1
 }
 
 # Installs and configures extlinux.
@@ -330,14 +396,16 @@ wgets() (
 
 #=============================  M a i n  ==============================#
 
-opts=$(getopt -n $PROGNAME -o b:cCf:hi:k:m:p:Pr:s:S:tv \
-	-l branch:,fs-skel-chown:,fs-skel-dir:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,partition,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
+opts=$(getopt -n $PROGNAME -o a:b:B:cCf:hi:k:m:p:Pr:s:S:tv \
+	-l arch:,boot-mode:,branch:,fs-skel-chown:,fs-skel-dir:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,partition,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
 	-- "$@") || help 1 >&2
 
 eval set -- "$opts"
 while [ $# -gt 0 ]; do
 	n=2
 	case "$1" in
+		-a | --arch) ARCH="$2";;
+		-B | --boot-mode) BOOT_MODE="$2";;
 		-b | --branch) ALPINE_BRANCH="$2";;
 		-S | --fs-skel-dir) FS_SKEL_DIR="$(realpath "$2")";;
 		     --fs-skel-chown) FS_SKEL_CHOWN="$2";;
@@ -363,14 +431,16 @@ done
 
 : ${ALPINE_BRANCH:="latest-stable"}
 : ${ALPINE_MIRROR:="http://dl-cdn.alpinelinux.org/alpine"}
+: ${ARCH:=}
 : ${CLEANUP:="yes"}
 : ${FS_SKEL_CHOWN:=}
 : ${FS_SKEL_DIR:=}
 : ${IMAGE_FORMAT:=}
 : ${IMAGE_SIZE:="2G"}
-: ${INITFS_FEATURES:="scsi virtio"}
+# kms includes virtio-gpu drivers used for graphical output. This is needed
+# for aarch64 where '-vga std' is not supported, but useful even for x86_64.
+: ${INITFS_FEATURES:="kms scsi virtio"}
 : ${KERNEL_FLAVOR:="virt"}
-: ${KEYS_DIR:="/etc/apk/keys"}
 : ${PACKAGES:=}
 : ${PARTITION:="no"}
 : ${REPOS_FILE:=}
@@ -380,6 +450,23 @@ done
 
 case "$ALPINE_BRANCH" in
 	[0-9]*) ALPINE_BRANCH="v$ALPINE_BRANCH";;
+esac
+
+if [ -z "$ARCH" ] || [ "$HOST_ARCH" = "$ARCH" ]; then
+	: ${KEYS_DIR:="/etc/apk/keys"}
+else
+	: ${KEYS_DIR:=}
+fi
+
+case "${ARCH:-"$HOST_ARCH"}" in
+	x86*) : ${BOOT_MODE:="BIOS"};;
+	*)    : ${BOOT_MODE:="UEFI"}
+	      [ "$BOOT_MODE" = 'BIOS' ] && die 'BIOS boot mode is supported only on x86/x86_64';;
+esac
+
+case "$BOOT_MODE" in
+	BIOS | UEFI) ;;
+	*) die "Invalid boot-mode: $BOOT_MODE";;
 esac
 
 if [ -f /etc/alpine-release ]; then
@@ -408,7 +495,9 @@ if [ "$INSTALL_HOST_PKGS" = yes ]; then
 	if ! grep -q -w "$ROOTFS" /proc/filesystems; then
 		modprobe $ROOTFS
 	fi
-	_apk add -t $VIRTUAL_PKG qemu-img $(fs_progs_pkg "$ROOTFS") rsync sfdisk
+
+	[ "$BOOT_MODE" = 'UEFI' ] && vfatpkg='dosfstools' || vfatpkg=
+	_apk add -t $VIRTUAL_PKG qemu-img $(fs_progs_pkg "$ROOTFS") $vfatpkg rsync sfdisk
 fi
 
 #-----------------------------------------------------------------------
@@ -423,29 +512,46 @@ if ! command -v "$APK" >/dev/null; then
 fi
 
 #-----------------------------------------------------------------------
-if [ ! -f "$IMAGE_FILE" ]; then
+if [ ! -f "$IMAGE_FILE" ] && [ ! -b "$IMAGE_FILE" ]; then
 	einfo "Creating $IMAGE_FORMAT image of size $IMAGE_SIZE"
 	qemu-img create ${IMAGE_FORMAT:+-f $IMAGE_FORMAT} "$IMAGE_FILE" "$IMAGE_SIZE"
 fi
 
 #-----------------------------------------------------------------------
-einfo "Attaching image $IMAGE_FILE as a NBD device"
+if [ -b "$IMAGE_FILE" ]; then
+	echo "Provided target $IMAGE_FILE is a block device" >&2
 
-nbd_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
-
-
-#-----------------------------------------------------------------------
-if [ "$PARTITION" = yes ]; then
-	einfo 'Creating GPT partition table'
-
-	printf '%s\n' 'label: gpt' 'name=system,type=L,bootable' | sfdisk "$nbd_dev"
-	root_dev="${nbd_dev}p1"
+	disk_dev="$IMAGE_FILE"
 else
-	root_dev="$nbd_dev"
+	einfo "Attaching image $IMAGE_FILE as a NBD device"
+
+	disk_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
 fi
 
 #-----------------------------------------------------------------------
-einfo "Formatting image to $ROOTFS"
+if [ "$PARTITION" = yes ] || [ "$BOOT_MODE" = 'UEFI' ]; then
+	einfo 'Creating GPT partition table'
+
+	create_gpt "$disk_dev" "$BOOT_MODE"
+
+	if [ "$BOOT_MODE" = 'BIOS' ]; then
+		root_dev="${disk_dev}p1"
+	else
+		esp_dev="${disk_dev}p1"
+		root_dev="${disk_dev}p2"
+	fi
+	# This is needed when running in a container.
+	settle_dev_node "$root_dev" || die "system didn't create $root_dev node"
+else
+	root_dev="$disk_dev"
+fi
+
+#-----------------------------------------------------------------------
+einfo 'Creating filesystem(s)'
+
+if [ "$BOOT_MODE" = 'UEFI' ]; then
+	mkfs.fat -F32 -n EFI "$esp_dev"
+fi
 
 # syslinux 6.0.3 cannot boot from ext4 w/ 64bit feature enabled.
 # -E nodiscard / -K - do not attempt to discard blocks at mkfs time (it's
@@ -461,6 +567,11 @@ mount_dir=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 einfo "Mounting image at $mount_dir"
 
 mount "$root_dev" "$mount_dir"
+
+if [ "$BOOT_MODE" = 'UEFI' ]; then
+	install -d -m 000 "$mount_dir"/boot
+	mount -t vfat "$esp_dev" "$mount_dir"/boot
+fi
 
 #-----------------------------------------------------------------------
 einfo 'Installing base system'
@@ -489,7 +600,14 @@ if [ -L /etc/apk/cache ]; then
 	ln -s "$apk_cache_dir" etc/apk/cache
 fi
 
-_apk add --root . --update-cache --initdb alpine-base
+_apk add --root . ${ARCH:+--arch "$ARCH"} --update-cache --initdb alpine-base
+
+fsprogs_pkgs=
+# btrfs doesn't use fsck, so we don't have to install btrfs-progs.
+[ "$ROOTFS" != 'btrfs' ] && fsprogs_pkgs="$(fs_progs_pkg "$ROOTFS")"
+[ "$BOOT_MODE" = 'UEFI' ] && fsprogs_pkgs="$fsprogs_pkgs dosfstools"
+[ "$fsprogs_pkgs" ] && _apk add --root . $fsprogs_pkgs
+
 prepare_chroot .
 
 #-----------------------------------------------------------------------
@@ -509,28 +627,55 @@ else
 fi
 
 #-----------------------------------------------------------------------
-einfo 'Setting up extlinux bootloader'
+if [ "$BOOT_MODE" = 'BIOS' ]; then
+	einfo 'Setting up extlinux bootloader'
 
-_apk add --root . --no-scripts syslinux
-setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT"
+	_apk add --root . --no-scripts syslinux
+	setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT"
 
-cat > etc/fstab <<-EOF
-	# <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
-	UUID=$root_uuid	/		$ROOTFS	noatime		0 1
-EOF
+	if [ "$PARTITION" = yes ]; then
+		dd bs=440 count=1 conv=notrunc if=usr/share/syslinux/gptmbr.bin of="$disk_dev"
+		sync
+	fi
+fi
 
 #-----------------------------------------------------------------------
 einfo 'Configuring system'
 
+cat > etc/fstab <<-EOF
+	# <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
+	UUID=$root_uuid	/		$ROOTFS	relatime	0 1
+EOF
+
+if [ "$BOOT_MODE" = 'UEFI' ]; then
+	echo "LABEL=EFI	/boot		vfat\
+	rw,relatime,fmask=0133,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro	0 2" \
+	>> etc/fstab
+
+	# This script is interpreted by UEFI.
+	# NOTE: When console=$SERIAL_PORT is added here, no messages are printed to
+	#  console on QEMU after switch_root. 'console=tty0' must be explicitly set
+	#  for aarch64 (it's the default on x86_64).
+	echo "vmlinuz-$KERNEL_FLAVOR" \
+		"initrd=initramfs-$KERNEL_FLAVOR" \
+		"root=UUID=$root_uuid" \
+		"rootfstype=$ROOTFS" \
+		"modules=$(echo $INITFS_FEATURES | tr ' ' ',')" \
+		'console=tty0' \
+		> boot/startup.nsh
+fi
+
 # We just prepare this config, but don't start the networking service.
 cat > etc/network/interfaces <<-EOF
-	iface lo inet loopback
-
+	auto eth0
 	iface eth0 inet dhcp
 
 	post-up /etc/network/if-post-up.d/*
 	post-down /etc/network/if-post-down.d/*
 EOF
+
+mkdir -p etc/network/if-post-up.d
+mkdir -p etc/network/if-post-down.d
 
 if [ "$SERIAL_PORT" ]; then
 	echo "$SERIAL_PORT" >> etc/securetty
@@ -544,6 +689,9 @@ rc_add sysinit devfs dmesg mdev hwdrivers
 [ -e etc/init.d/cgroups ] && rc_add sysinit cgroups ||:  # since v3.8
 
 rc_add boot modules hwclock swap hostname sysctl bootmisc syslog
+# urandom was renamed to seedrng in v3.17
+[ -e etc/init.d/seedrng ] && rc_add boot seedrng || rc_add boot urandom
+
 rc_add shutdown killprocs savecache mount-ro
 
 #-----------------------------------------------------------------------
