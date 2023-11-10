@@ -90,7 +90,7 @@
 #
 #   -h --help                             Show this help message and exit.
 #
-#   -v --version                          Print version and exit.
+#   -V --version                          Print version and exit.
 #
 #   APK                                   APK command to use. Default is "apk".
 #
@@ -392,7 +392,7 @@ wgets() (
 
 #=============================  M a i n  ==============================#
 
-opts=$(getopt -n $PROGNAME -o a:b:B:cCf:hi:k:m:p:Pr:s:S:tv \
+opts=$(getopt -n $PROGNAME -o a:b:B:cCf:hi:k:m:p:Pr:s:S:tV \
 	-l arch:,boot-mode:,branch:,fs-skel-chown:,fs-skel-dir:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,partition,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
 	-- "$@") || help 1 >&2
 
