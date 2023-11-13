@@ -1,23 +1,58 @@
 version: 2
 updates:
+  # Maintain dependencies for Docker
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "feat(deps): "
+    labels:
+      - dependencies
+      - docker
+    assignees:
+      - "tuxpeople"
+    # target-branch: "develop"
 
-# Maintain dependencies for Docker
-- package-ecosystem: "docker"
-  directory: "/"
-  schedule:
-    interval: "daily"
-  commit-message:
-    prefix: "feat: "
-  assignees:
-    - "tuxpeople"
+  # Maintain dependencies for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore(ci): "
+    labels:
+      - dependencies
+      - github-actions
+    open-pull-requests-limit: 10
+    assignees:
+      - "tuxpeople"
+    # target-branch: "develop"
 
-# Maintain dependencies for GitHub Actions
-- package-ecosystem: "github-actions"
-  directory: "/"
-  schedule:
-    interval: "daily"
-  commit-message:
-    prefix: "chore(ci): "
-  open-pull-requests-limit: 10
-  assignees:
-    - "tuxpeople"
+  # Maintain dependencies for Python
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: "daily"
+      # time: "11:00"
+      # timezone: "Europe/Zurich"
+    commit-message:
+      prefix: "feat(deps): "
+    labels:
+      - dependencies
+      - python
+    # target-branch: "develop"
+
+  # Maintain dependencies for Ruby
+  - package-ecosystem: bundler
+    directory: /
+    schedule:
+      interval: daily
+    allow:
+      - dependency-type: direct
+    commit-message:
+      prefix: "feat(deps): "
+    labels:
+      - dependencies
+      - ruby
+    # target-branch: "develop"
