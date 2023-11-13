@@ -10,6 +10,7 @@ updates:
     labels:
       - dependencies
       - docker
+    open-pull-requests-limit: 10
     assignees:
       - "tuxpeople"
     # target-branch: "develop"
@@ -41,6 +42,9 @@ updates:
     labels:
       - dependencies
       - python
+    open-pull-requests-limit: 10
+    assignees:
+      - "tuxpeople"
     # target-branch: "develop"
 
   # Maintain dependencies for Ruby
@@ -55,4 +59,7 @@ updates:
     labels:
       - dependencies
       - ruby
+    open-pull-requests-limit: 10
+    assignees:
+      - "tuxpeople"
     # target-branch: "develop"
