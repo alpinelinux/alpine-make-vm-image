@@ -605,12 +605,6 @@ fsprogs_pkgs=
 prepare_chroot .
 
 #-----------------------------------------------------------------------
-einfo "Installing and configuring mkinitfs"
-
-_apk add --root . mkinitfs
-setup_mkinitfs . "base $ROOTFS $INITFS_FEATURES"
-
-#-----------------------------------------------------------------------
 einfo "Installing kernel linux-$KERNEL_FLAVOR"
 
 if [ "$KERNEL_FLAVOR" = 'virt' ]; then
@@ -619,6 +613,12 @@ else
 	# Avoid installing *all* linux-firmware-* packages (see #21).
 	_apk add --root . linux-$KERNEL_FLAVOR linux-firmware-none
 fi
+
+#-----------------------------------------------------------------------
+einfo "Installing and configuring mkinitfs"
+
+_apk add --root . mkinitfs
+setup_mkinitfs . "base $ROOTFS $INITFS_FEATURES"
 
 #-----------------------------------------------------------------------
 if [ "$BOOT_MODE" = 'BIOS' ]; then
