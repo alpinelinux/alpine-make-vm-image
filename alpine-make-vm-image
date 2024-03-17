@@ -738,8 +738,10 @@ if grep -qw "$RESOLVCONF_MARK" etc/resolv.conf 2>/dev/null; then
 fi
 
 if [ -n "$apk_cache_dir" ]; then
-    rm etc/apk/cache >/dev/null 2>&1
-    rm $apk_cache_dir > /dev/null 2>&1
+    # remove symlink and dir created by bind mount
+    rm etc/apk/cache >/dev/null ||:
+    umount $mount_dir/$apk_cache_dir ||:
+    rm $mount_dir/$apk_cache_dir ||:
 else
     rm -Rf var/cache/apk/* ||:
 fi
