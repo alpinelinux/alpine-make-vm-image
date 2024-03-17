@@ -739,6 +739,7 @@ fi
 
 if [ -n "$apk_cache_dir" ]; then
     rm etc/apk/cache >/dev/null 2>&1
+    rm $apk_cache_dir > /dev/null 2>&1
 else
     rm -Rf var/cache/apk/* ||:
 fi
