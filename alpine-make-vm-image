@@ -90,7 +90,7 @@
 #
 #   -h --help                             Show this help message and exit.
 #
-#   -v --version                          Print version and exit.
+#   -V --version                          Print version and exit.
 #
 #   APK                                   APK command to use. Default is "apk".
 #
@@ -115,7 +115,7 @@ set -eu
 PATH="$PATH:/usr/sbin:/usr/bin:/sbin:/bin"
 
 readonly PROGNAME='alpine-make-vm-image'
-readonly VERSION='0.12.0'
+readonly VERSION='0.13.0'
 readonly VIRTUAL_PKG=".make-$PROGNAME"
 # An opaque string used to detect changes in resolv.conf.
 readonly RESOLVCONF_MARK="### created by $PROGNAME ###"
@@ -396,7 +396,7 @@ wgets() (
 
 #=============================  M a i n  ==============================#
 
-opts=$(getopt -n $PROGNAME -o a:b:B:cCf:hi:k:m:p:Pr:s:S:tv \
+opts=$(getopt -n $PROGNAME -o a:b:B:cCf:hi:k:m:p:Pr:s:S:tV \
 	-l arch:,boot-mode:,branch:,fs-skel-chown:,fs-skel-dir:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,partition,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
 	-- "$@") || help 1 >&2
 
@@ -611,12 +611,6 @@ fsprogs_pkgs=
 prepare_chroot .
 
 #-----------------------------------------------------------------------
-einfo "Installing and configuring mkinitfs"
-
-_apk add --root . mkinitfs
-setup_mkinitfs . "base $ROOTFS $INITFS_FEATURES"
-
-#-----------------------------------------------------------------------
 einfo "Installing kernel linux-$KERNEL_FLAVOR"
 
 if [ "$KERNEL_FLAVOR" = 'virt' ]; then
@@ -625,6 +619,12 @@ else
 	# Avoid installing *all* linux-firmware-* packages (see #21).
 	_apk add --root . linux-$KERNEL_FLAVOR linux-firmware-none
 fi
+
+#-----------------------------------------------------------------------
+einfo "Installing and configuring mkinitfs"
+
+_apk add --root . mkinitfs
+setup_mkinitfs . "base $ROOTFS $INITFS_FEATURES"
 
 #-----------------------------------------------------------------------
 if [ "$BOOT_MODE" = 'BIOS' ]; then
