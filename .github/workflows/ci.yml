@@ -13,7 +13,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install qemu-utils
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Build image for x86_64 with BIOS mode and without GPT
         run: |
