@@ -115,7 +115,7 @@ set -eu
 PATH="$PATH:/usr/sbin:/usr/bin:/sbin:/bin"
 
 readonly PROGNAME='alpine-make-vm-image'
-readonly VERSION='0.13.1'
+readonly VERSION='0.13.2'
 readonly VIRTUAL_PKG=".make-$PROGNAME"
 # An opaque string used to detect changes in resolv.conf.
 readonly RESOLVCONF_MARK="### created by $PROGNAME ###"
