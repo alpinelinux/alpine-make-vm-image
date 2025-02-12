@@ -554,6 +554,8 @@ fi
 # useless for NBD image and prints confusing error).
 [ "$ROOTFS" = ext4 ] && mkfs_args='-O ^64bit -E nodiscard' || mkfs_args='-K'
 
+sleep 1  # see #45
+
 mkfs.$ROOTFS -L root $mkfs_args "$root_dev"
 
 root_uuid=$(blk_uuid "$root_dev")
