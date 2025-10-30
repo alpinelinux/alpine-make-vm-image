@@ -8,8 +8,8 @@ ifdef::env-github[]
 image:https://github.com/{gh-name}/workflows/CI/badge.svg["Build Status", link="https://github.com/{gh-name}/actions"]
 endif::env-github[]
 
-This project provides a script for making customized https://alpinelinux.org/[Alpine Linux] disk images for x86_64 and aarch64 footnote:[Supported since Alpine Linux v3.19. See <<aarch64-old>>.] virtual machines.
-You can choose between BIOS mode (using https://syslinux.org/[Syslinux], only for x86_64) and UEFI mode (using Linux https://docs.kernel.org/admin-guide/efi-stub.html[EFI stub]).
+This project provides a script for making customized https://alpinelinux.org/[Alpine Linux] disk images for x86_64, aarch64 footnote:[Supported since Alpine Linux v3.19. See <<aarch64-old>>.] and s390x virtual machines.
+You can choose between BIOS mode (using https://syslinux.org/[Syslinux], only for x86_64), UEFI mode (using Linux https://docs.kernel.org/admin-guide/efi-stub.html[EFI stub]) and IPL mode (using Linux https://www.ibm.com/docs/en/linux-on-systems?topic=usage-boot-device[zipl], only for s390x).
 It’s quite simple (400 LoC of shell), fast (~32 seconds on GitHub Actions), requires minimum dependencies (QEMU and filesystem tools).
 
 TIP: Don’t need VM, just wanna chroot into Alpine Linux?
@@ -106,6 +106,34 @@ https://dl-cdn.alpinelinux.org/alpine/v3.18/community
 . Run {script-name} with the options `--repositories-file ./repositories` and `--packages linux-virt@v319` (or `linux-lts@v319` if you use `--kernel-flavor lts`).
 
 This will first install _linux-virt_ from v3.18, but in the later step it will reinstall it from the v3.19 branch.
+
+=== Create image for s390x on s390x host
+
+On Debian/Ubuntu::
++
+[source, sh]
+apt install qemu-system-s390x
+apt install qemu-utils 
+
+After that, run {script-name} with the option `--arch s390x`.
+
+Ex: 
+[source,sh]
+----
+sudo ./alpine-make-vm-image \
+  --arch s390x \
+  --image-format qcow2 \
+  --image-size 2G \
+  --branch v3.19 \
+  --serial-console \
+  -k lts \
+  --packages "$(cat example/packages)" \
+  --fs-skel-dir example/rootfs \
+  --fs-skel-chown root:root \
+  --script-chroot alpine-s390x-$(date +%Y-%m-%d).qcow2 \
+  -- ./example/configure.sh
+----
+
 
 
 === Create image for VMware (ESXi)

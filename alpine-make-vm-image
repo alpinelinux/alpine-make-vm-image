@@ -31,10 +31,10 @@
 #   -a --arch ARCH                        Target CPU architecture. If it doesn't match the host's
 #                                         architecture, you must register an interpreter (emulator)
 #                                         for the target architecture in binfmt, e.g. qemu userspace
-#                                         emulator. Options: x86_64, aarch64 (Alpine v3.19+ / edge).
+#                                         emulator. Options: x86_64, aarch64 and s390x (Alpine v3.19+ / edge).
 #
-#   -B --boot-mode BOOT_MODE              Either "BIOS" (default on x86/x86_64) or "UEFI" (default
-#                                         on others). "BIOS" is supported only on x86/x86_64.
+#   -B --boot-mode BOOT_MODE              Either "BIOS" (default on x86/x86_64) or "IPL" (default on s390x) or "UEFI" (default
+#                                         on others). "BIOS" is supported only on x86/x86_64. "IPL" is supported only on s390x. 
 #
 #   -b --branch ALPINE_BRANCH             Alpine branch to install; used only when
 #                                         --repositories-file is not specified. Default is
@@ -120,13 +120,15 @@ readonly VIRTUAL_PKG=".make-$PROGNAME"
 # An opaque string used to detect changes in resolv.conf.
 readonly RESOLVCONF_MARK="### created by $PROGNAME ###"
 
-# Alpine APK keys for verification of packages for x86_64 and aarch64.
+# Alpine APK keys for verification of packages for x86_64, aarch64 and s390x.
 readonly ALPINE_KEYS='
 4a6a0840:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1yHJxQgsHQREclQu4Ohe\nqxTxd1tHcNnvnQTu/UrTky8wWvgXT+jpveroeWWnzmsYlDI93eLI2ORakxb3gA2O\nQ0Ry4ws8vhaxLQGC74uQR5+/yYrLuTKydFzuPaS1dK19qJPXB8GMdmFOijnXX4SA\njixuHLe1WW7kZVtjL7nufvpXkWBGjsfrvskdNA/5MfxAeBbqPgaq0QMEfxMAn6/R\nL5kNepi/Vr4S39Xvf2DzWkTLEK8pcnjNkt9/aafhWqFVW7m3HCAII6h/qlQNQKSo\nGuH34Q8GsFG30izUENV9avY7hSLq7nggsvknlNBZtFUcmGoQrtx3FmyYsIC8/R+B\nywIDAQAB
 5261cecb:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwlzMkl7b5PBdfMzGdCT0\ncGloRr5xGgVmsdq5EtJvFkFAiN8Ac9MCFy/vAFmS8/7ZaGOXoCDWbYVLTLOO2qtX\nyHRl+7fJVh2N6qrDDFPmdgCi8NaE+3rITWXGrrQ1spJ0B6HIzTDNEjRKnD4xyg4j\ng01FMcJTU6E+V2JBY45CKN9dWr1JDM/nei/Pf0byBJlMp/mSSfjodykmz4Oe13xB\nCa1WTwgFykKYthoLGYrmo+LKIGpMoeEbY1kuUe04UiDe47l6Oggwnl+8XD1MeRWY\nsWgj8sF4dTcSfCMavK4zHRFFQbGp/YFJ/Ww6U9lA3Vq0wyEI6MCMQnoSMFwrbgZw\nwwIDAQAB
 6165ee59:MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAutQkua2CAig4VFSJ7v54\nALyu/J1WB3oni7qwCZD3veURw7HxpNAj9hR+S5N/pNeZgubQvJWyaPuQDm7PTs1+\ntFGiYNfAsiibX6Rv0wci3M+z2XEVAeR9Vzg6v4qoofDyoTbovn2LztaNEjTkB+oK\ntlvpNhg1zhou0jDVYFniEXvzjckxswHVb8cT0OMTKHALyLPrPOJzVtM9C1ew2Nnc\n3848xLiApMu3NBk0JqfcS3Bo5Y2b1FRVBvdt+2gFoKZix1MnZdAEZ8xQzL/a0YS5\nHd0wj5+EEKHfOd3A75uPa/WQmA+o0cBFfrzm69QDcSJSwGpzWrD1ScH3AK8nWvoj\nv7e9gukK/9yl1b4fQQ00vttwJPSgm9EnfPHLAtgXkRloI27H6/PuLoNvSAMQwuCD\nhQRlyGLPBETKkHeodfLoULjhDi1K2gKJTMhtbnUcAA7nEphkMhPWkBpgFdrH+5z4\nLxy+3ek0cqcI7K68EtrffU8jtUj9LFTUC8dERaIBs7NgQ/LfDbDfGh9g6qVj1hZl\nk9aaIPTm/xsi8v3u+0qaq7KzIBc9s59JOoA8TlpOaYdVgSQhHHLBaahOuAigH+VI\nisbC9vmqsThF2QdDtQt37keuqoda2E6sL7PUvIyVXDRfwX7uMDjlzTxHTymvq2Ck\nhtBqojBnThmjJQFgZXocHG8CAwEAAQ==
 58199dcc:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3v8/ye/V/t5xf4JiXLXa\nhWFRozsnmn3hobON20GdmkrzKzO/eUqPOKTpg2GtvBhK30fu5oY5uN2ORiv2Y2ht\neLiZ9HVz3XP8Fm9frha60B7KNu66FO5P2o3i+E+DWTPqqPcCG6t4Znk2BypILcit\nwiPKTsgbBQR2qo/cO01eLLdt6oOzAaF94NH0656kvRewdo6HG4urbO46tCAizvCR\nCA7KGFMyad8WdKkTjxh8YLDLoOCtoZmXmQAiwfRe9pKXRH/XXGop8SYptLqyVVQ+\ntegOD9wRs2tOlgcLx4F/uMzHN7uoho6okBPiifRX+Pf38Vx+ozXh056tjmdZkCaV\naQIDAQAB
 616ae350:MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAyduVzi1mWm+lYo2Tqt/0\nXkCIWrDNP1QBMVPrE0/ZlU2bCGSoo2Z9FHQKz/mTyMRlhNqTfhJ5qU3U9XlyGOPJ\npiM+b91g26pnpXJ2Q2kOypSgOMOPA4cQ42PkHBEqhuzssfj9t7x47ppS94bboh46\nxLSDRff/NAbtwTpvhStV3URYkxFG++cKGGa5MPXBrxIp+iZf9GnuxVdST5PGiVGP\nODL/b69sPJQNbJHVquqUTOh5Ry8uuD2WZuXfKf7/C0jC/ie9m2+0CttNu9tMciGM\nEyKG1/Xhk5iIWO43m4SrrT2WkFlcZ1z2JSf9Pjm4C2+HovYpihwwdM/OdP8Xmsnr\nDzVB4YvQiW+IHBjStHVuyiZWc+JsgEPJzisNY0Wyc/kNyNtqVKpX6dRhMLanLmy+\nf53cCSI05KPQAcGj6tdL+D60uKDkt+FsDa0BTAobZ31OsFVid0vCXtsbplNhW1IF\nHwsGXBTVcfXg44RLyL8Lk/2dQxDHNHzAUslJXzPxaHBLmt++2COa2EI1iWlvtznk\nOk9WP8SOAIj+xdqoiHcC4j72BOVVgiITIJNHrbppZCq6qPR+fgXmXa+sDcGh30m6\n9Wpbr28kLMSHiENCWTdsFij+NQTd5S47H7XTROHnalYDuF1RpS+DpQidT5tUimaT\nJZDr++FjKrnnijbyNF8b98UCAwEAAQ==
+58e4f17d:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvBxJN9ErBgdRcPr5g4hVqyUSGZEKuvQliq2Z9SRHLh2J43+EdB6A+yzVvLnzcHVpBJ+BZ9RV30EM9guck9shr+bryZcRHyjG2wiIEoduxF2a8KeWeQH7QlpwGhuobo1+gA8L0AGImiA6UP3LOirlI0G2+iaKZowME8/tydww4jx5vG132JCOScMjTalRsYZYJcjFbebQQolpqRaGB4iGWqhytWQGWuKiB1A22wjmIYf3t96l1Mp+FmM2URPxD1gk/BIBnX7ew+2gWppXOK9j1BJpo0/HaX5XoZ/uMqISAAtgHZAqq+g3IUPouxTphgYQRTRYpz2COw3NF43VYQrRbQIDAQAB
+616ac3bc:MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAvaaoSLab+IluixwKV5Od0gib2YurjPatGIbn5Ov2DLUFYiebj2oJINXJSwUOO+4WcuHFEqiL/1rya+k5hLZthnPL1tn6QD4rESznvGSasRCQNT2vS/oyZbTYJRyAtFkEYLlq0t3S3xBxxHWuvIf0qVxVNYpQWyM3N9RIeYBR/euXKJXileSHk/uq1I5wTC0XBIHWcthczGN0m9wBEiWS0m3cnPk4q0Ea8mUJ91Rqob19qETz6VbSPYYpZk3qOycjKosuwcuzoMpwU8KRiMFd5LHtX0Hx85ghGsWDVtS0c0+aJa4lOMGvJCAOvDfqvODv7gKlCXUpgumGpLdTmaZ81RwqspAe3IqBcdKTqRD4m2mSg23nVx2FAY3cjFvZQtfooT7q1ItRV5RgH6FhQSl7+6YIMJ1Bf8AAlLdRLpg+doOUGcEn+pkDiHFgI8ylH1LKyFKw+eXaAml/7DaWZk1ddqggwhXOhc/UUZFQuQQ8A8zpA13PcbC05XxN2hyP93tCEtyynMLVPtrRwDnHxFKaqKzs3rMDXPSXRn3ZZTdKH3069ApkEjQdpcwUh+EmJ1Ve/5cdtzT6kKWCjKBFZP/s91MlRrX2BTRdHaU5QJkUheUtakwxuHrdah2F94lRmsnQlpPr2YseJu6sIE+Dnx4MCfhdVbQL2w54R645nlnohu8CAwEAAQ==
 '
 
 readonly HOST_ARCH="$(uname -m)"
@@ -135,6 +137,8 @@ readonly HOST_ARCH="$(uname -m)"
 case "$HOST_ARCH" in
 	aarch64) : ${APK_TOOLS_SHA256:="e471d35aa221d031abe9b6288aede12a8e9f1a398954e5a2e1d1bce1727b4ef4"};;
 	x86_64) : ${APK_TOOLS_SHA256:="34bb1a96f0258982377a289392d4ea9f3f4b767a4bb5806b1b87179b79ad8a1c"};;
+	s390x)  : ${APK_TOOLS_SHA256:="6880a5f5e7f62e1f4c47ad3a75d699f9b1f99f3f20f9f8be01637bef1012b8e7"};;
+	
 esac
 
 : ${APK_TOOLS_URI:="https://gitlab.alpinelinux.org/api/v4/projects/5/packages/generic/v2.14.10/$HOST_ARCH/apk.static"}
@@ -457,13 +461,23 @@ else
 fi
 
 case "${ARCH:-"$HOST_ARCH"}" in
-	x86*) : ${BOOT_MODE:="BIOS"};;
-	*)    : ${BOOT_MODE:="UEFI"}
-	      [ "$BOOT_MODE" = 'BIOS' ] && die 'BIOS boot mode is supported only on x86/x86_64';;
+	x86*) 
+		: ${BOOT_MODE:="BIOS"}
+        [ "$BOOT_MODE" = 'IPL' ] && die 'IPL boot mode is supported only on s390x'
+		;;
+	s390x)
+		: ${BOOT_MODE:="IPL"}
+        [ "$BOOT_MODE" != 'IPL' ] && die 's390x supports IPL boot mode only'
+		;;
+	*)
+		: ${BOOT_MODE:="UEFI"}
+		[ "$BOOT_MODE" = 'BIOS' ] && die 'BIOS boot mode is supported only on x86/x86_64'
+        [ "$BOOT_MODE" = 'IPL' ] && die 'IPL boot mode is supported only on s390x'
+		;;
 esac
 
 case "$BOOT_MODE" in
-	BIOS | UEFI) ;;
+	BIOS | UEFI | IPL) ;;
 	*) die "Invalid boot-mode: $BOOT_MODE";;
 esac
 
@@ -474,7 +488,13 @@ else
 fi
 
 SERIAL_PORT=
-[ "$SERIAL_CONSOLE" = 'no' ] || SERIAL_PORT='ttyS0'
+if [ "$SERIAL_CONSOLE" != 'no' ]; then 
+   if [ "$ARCH" = 's390x' ]; then
+       SERIAL_PORT='ttysclp0'
+   else 
+       SERIAL_PORT='ttyS0'
+   fi
+fi
 
 [ $# -ne 0 ] || help 1 >&2
 
@@ -580,10 +600,17 @@ mkdir -p etc/apk/keys
 if [ "$REPOS_FILE" ]; then
 	install -m 644 "$REPOS_FILE" etc/apk/repositories
 else
+# On s390x, cloud-init packages are not included in stable Alpine branches (v3.x).
+# They are available only in the edge branch under the community repository.
 	cat > etc/apk/repositories <<-EOF
 		$ALPINE_MIRROR/$ALPINE_BRANCH/main
 		$ALPINE_MIRROR/$ALPINE_BRANCH/community
 	EOF
+     # On s390x, cloud-init packages are not included in stable Alpine branches (v3.x).
+     # They are available only in the edge branch under the community repository.
+     if [ "$ARCH" = "s390x" ]; then
+        echo "$ALPINE_MIRROR/edge/community" >> etc/apk/repositories
+     fi
 fi
 if [ -d "$KEYS_DIR" ]; then
 	cp "$KEYS_DIR"/* etc/apk/keys/
@@ -642,6 +669,30 @@ cat > etc/fstab <<-EOF
 	# <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
 	UUID=$root_uuid	/		$ROOTFS	relatime	0 1
 EOF
+
+if [ "$ARCH" = "s390x" ]; then
+    einfo "Setting up zIPL bootloader"
+_apk add --root . --no-scripts s390-tools
+   echo 'ttysclp0::respawn:/sbin/getty -L ttysclp0 115200 vt100' >> "$mount_dir/etc/inittab"
+    # Create a minimal, working zIPL configuration
+    mkdir -p "$mount_dir/etc"
+    cat > "$mount_dir/etc/zipl.conf" <<EOF
+[defaultboot]
+    default=alpine
+    target=/boot
+    targetbase=$disk_dev
+    targettype=scsi
+    targetblocksize=512
+    targetoffset=0
+
+[alpine]
+    image=/boot/vmlinuz-lts
+    ramdisk=/boot/initramfs-lts
+    parameters="root=UUID=$root_uuid rw rootwait rootfstype=$ROOTFS console=$SERIAL_PORT"
+EOF
+    # Run zIPL inside the chroot
+    chroot "$mount_dir" /sbin/zipl || die "zIPL failed"
+fi
 
 if [ "$BOOT_MODE" = 'UEFI' ]; then
 	echo "LABEL=EFI	/boot		vfat\
