@@ -82,6 +82,8 @@ jobs:
 
       - name: Set up latest Alpine Linux
         uses: jirutka/setup-alpine@v1
+        with:
+          branch: v3.22
 
       - name: Build image for x86_64 with BIOS mode and without GPT
         run: |
