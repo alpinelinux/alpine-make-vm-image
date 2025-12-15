@@ -156,10 +156,6 @@ einfo() {
 	printf '\n\033[1;36m> %s\033[0m\n' "$@" >&2  # bold cyan
 }
 
-ewarn() {
-	printf '\033[1;33mWARNING:\033[0m %s\n' "$@" >&2  # bold yellow
-}
-
 # Prints help and exists with the specified status.
 help() {
 	sed -En '/^#---help---/,/^#---help---/p' "$0" | sed -E 's/^# ?//; 1d;$d;'
@@ -187,21 +183,6 @@ cleanup() {
 	if [ "$INSTALL_HOST_PKGS" = yes ]; then
 		_apk del $VIRTUAL_PKG
 	fi
-}
-
-# Verifies that UEFI boot files are properly installed
-verify_uefi_boot() {
-	local mnt="$1"
-	
-	if [ ! -f "$mnt/boot/EFI/BOOT/BOOTX64.EFI" ]; then
-		return 1
-	fi
-	
-	if [ ! -f "$mnt/boot/grub/grub.cfg" ]; then
-		return 1
-	fi
-	
-	return 0
 }
 
 _apk() {
@@ -344,9 +325,9 @@ prepare_gpu_env() {
 	chmod +x "$dest/usr/local/bin/nvidia-container-cli"
 
 	# Download and extract Fabric Manager
-	local fm_url="https://developer.download.nvidia.com/compute/nvidia-driver/redist/fabricmanager/linux-x86_64/fabricmanager-linux-x86_64-570.158.01-archive.tar.xz"
-	local archive="fabricmanager-linux-x86_64-570.158.01-archive.tar.xz"
-	local fb_dir="fabricmanager-linux-x86_64-570.158.01-archive"
+	local fm_url="https://developer.download.nvidia.com/compute/nvidia-driver/redist/fabricmanager/linux-x86_64/fabricmanager-linux-x86_64-570.148.08-archive.tar.xz"
+	local archive="fabricmanager-linux-x86_64-570.148.08-archive.tar.xz"
+	local fb_dir="fabricmanager-linux-x86_64-570.148.08-archive"
 
 	wget -q "$fm_url"
 	tar -xf "$archive"
@@ -474,9 +455,8 @@ wgets() (
 
 #=============================  M a i n  ==============================#
 
-# rootfs-b200.tar.gz is the nvidia container toolkit 
-wget https://objectstore.mum1.civo.com/gpu/rootfs-b200.tar.gz
-tar -vxf rootfs-b200.tar.gz 
+wget https://objectstore.mum1.civo.com/gpu/rootfs.tar.gz
+tar -vxf rootfs.tar.gz 
 
 opts=$(getopt -n $PROGNAME -o a:b:B:cCf:hi:k:m:p:Pr:s:S:tV \
 	-l arch:,boot-mode:,branch:,fs-skel-chown:,fs-skel-dir:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,partition,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
@@ -638,23 +618,7 @@ fi
 # syslinux 6.0.3 cannot boot from ext4 w/ 64bit feature enabled.
 # -E nodiscard / -K - do not attempt to discard blocks at mkfs time (it's
 # useless for NBD image and prints confusing error).
-# For Alpine 3.17 compatibility, we need to disable newer ext4 features
-if [ "$ROOTFS" = ext4 ]; then
-	# Check if we're using an older Alpine branch
-	case "$ALPINE_BRANCH" in
-		v3.1[0-7]|v3.17)
-			# Disable newer ext4 features for compatibility with older e2fsck
-			# orphan_file is not supported in Alpine 3.17's e2fsprogs
-			mkfs_args='-O ^64bit,^metadata_csum -E nodiscard'
-			;;
-		*)
-			# For newer Alpine versions, just disable 64bit
-			mkfs_args='-O ^64bit -E nodiscard'
-			;;
-	esac
-else
-	mkfs_args='-K'
-fi
+[ "$ROOTFS" = ext4 ] && mkfs_args='-O ^64bit -E nodiscard' || mkfs_args='-K'
 
 mkfs.$ROOTFS -L root $mkfs_args "$root_dev"
 
@@ -666,9 +630,9 @@ einfo "Mounting image at $mount_dir"
 
 mount "$root_dev" "$mount_dir"
 
-# Don't mount ESP yet if UEFI - we'll mount it after kernel installation
 if [ "$BOOT_MODE" = 'UEFI' ]; then
-	install -d -m 755 "$mount_dir"/boot
+	install -d -m 000 "$mount_dir"/boot
+	mount -t vfat "$esp_dev" "$mount_dir"/boot
 fi
 
 #-----------------------------------------------------------------------
@@ -722,8 +686,6 @@ einfo "Installing and configuring mkinitfs"
 _apk add --root . mkinitfs
 setup_mkinitfs . "base $ROOTFS $INITFS_FEATURES"
 
-# The kernel package installation already triggers mkinitfs, so we don't need to run it again
-
 #-----------------------------------------------------------------------
 if [ "$BOOT_MODE" = 'BIOS' ]; then
 	einfo 'Setting up extlinux bootloader'
@@ -738,90 +700,6 @@ if [ "$BOOT_MODE" = 'BIOS' ]; then
 fi
 
 #-----------------------------------------------------------------------
-if [ "$BOOT_MODE" = 'UEFI' ]; then
-	einfo 'Setting up UEFI bootloader'
-	
-	# Now mount the ESP
-	einfo 'Mounting ESP partition'
-	mount -t vfat "$esp_dev" boot
-
-	# Install GRUB EFI packages
-	_apk add --root . grub-efi efibootmgr
-
-	# Create necessary EFI directories
-	mkdir -p boot/efi
-	mkdir -p boot/grub
-
-	# Mount the ESP if not already mounted (should already be mounted from line 539)
-	if ! mountpoint -q boot; then
-		mount -t vfat "$esp_dev" boot
-	fi
-
-	# Install GRUB to the EFI system partition in removable media mode
-	# This ensures maximum compatibility with different UEFI implementations
-	chroot . grub-install \
-		--target=x86_64-efi \
-		--efi-directory=/boot \
-		--bootloader-id=ALPINE \
-		--removable \
-		--recheck \
-		--no-nvram 2>/dev/null || {
-			# Fallback: Try without chroot if that fails
-			grub-install \
-				--target=x86_64-efi \
-				--efi-directory=boot \
-				--bootloader-id=ALPINE \
-				--removable \
-				--recheck \
-				--no-nvram \
-				--boot-directory=boot \
-				--root-directory=.
-		}
-
-	# Copy kernel and initramfs from root filesystem to ESP
-	einfo 'Copying kernel and initramfs to ESP partition'
-	# Create a bind mount to access the root filesystem's /boot that's hidden by ESP mount
-	mkdir -p mnt-boot-temp
-	mount --bind . mnt-boot-temp
-	cp mnt-boot-temp/boot/vmlinuz-$KERNEL_FLAVOR boot/
-	cp mnt-boot-temp/boot/initramfs-$KERNEL_FLAVOR boot/
-	umount mnt-boot-temp
-	rmdir mnt-boot-temp
-	
-	# Create GRUB configuration
-	cat > boot/grub/grub.cfg <<-GRUBEOF
-		set default=0
-		set timeout=5
-		set gfxmode=auto
-		set gfxpayload=keep
-		insmod efi_gop
-		insmod efi_uga
-
-		menuentry "Alpine Linux $KERNEL_FLAVOR" {
-			set root=(hd0,gpt1)
-			linux /vmlinuz-$KERNEL_FLAVOR root=UUID=$root_uuid rootfstype=$ROOTFS modules=$(echo $INITFS_FEATURES | tr ' ' ',') console=tty0 ${SERIAL_PORT:+console=$SERIAL_PORT}
-			initrd /initramfs-$KERNEL_FLAVOR
-		}
-	GRUBEOF
-
-	# Verify that the EFI boot files were created
-	if [ ! -f boot/EFI/BOOT/BOOTX64.EFI ]; then
-		die "Failed to create UEFI boot files"
-	fi
-
-	# Also copy to alpine directory for additional compatibility
-	mkdir -p boot/EFI/alpine
-	cp boot/EFI/BOOT/BOOTX64.EFI boot/EFI/alpine/grubx64.efi 2>/dev/null || true
-	
-	# Verify UEFI installation
-	if ! verify_uefi_boot .; then
-		ewarn "UEFI boot verification failed, but continuing..."
-	else
-		einfo "UEFI boot files verified successfully"
-	fi
-fi
-
-#-----------------------------------------------------------------------
 einfo 'Configuring system'
 
 cat > etc/fstab <<-EOF
@@ -830,9 +708,8 @@ cat > etc/fstab <<-EOF
 EOF
 
 if [ "$BOOT_MODE" = 'UEFI' ]; then
-	esp_uuid=$(blk_uuid "$esp_dev")
-	echo "UUID=$esp_uuid	/boot		vfat\
-	rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro	0 2" \
+	echo "LABEL=EFI	/boot		vfat\
+	rw,relatime,fmask=0133,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro	0 2" \
 	>> etc/fstab
 
 	# This script is interpreted by UEFI.
@@ -880,10 +757,6 @@ rc_add shutdown killprocs savecache mount-ro
 #-----------------------------------------------------------------------
 if [ "$PACKAGES" ]; then
 	einfo 'Installing additional packages'
-	# Ensure GRUB is installed for UEFI
-	if [ "$BOOT_MODE" = 'UEFI' ]; then
-		PACKAGES="$PACKAGES grub-efi efibootmgr"
-	fi
 	_apk add --root . $PACKAGES
 fi
 
