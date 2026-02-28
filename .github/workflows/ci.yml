@@ -80,8 +80,11 @@ jobs:
       # We must run this outside the chroot.
       - run: sudo modprobe nbd max_part=16
 
-      - name: Set up latest Alpine Linux
+      - name: Set up Alpine Linux v3.22
         uses: jirutka/setup-alpine@v1
+        with:
+          # XXX: v3.23 doesn't work here, running package triggers results in "unshare: Invalid argument"
+          branch: v3.22
 
       - name: Build image for x86_64 with BIOS mode and without GPT
         run: |
