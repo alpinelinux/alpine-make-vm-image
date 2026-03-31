@@ -482,7 +482,10 @@ IMAGE_FILE="$1"; shift
 SCRIPT=
 [ $# -eq 0 ] || { SCRIPT=$(realpath "$1"); shift; }
 
-[ "$CLEANUP" = no ] || trap cleanup EXIT HUP INT TERM
+if [ "$CLEANUP" != 'no' ]; then
+	trap 'cleanup; exit 0' EXIT
+	trap 'cleanup; exit 130' HUP INT TERM
+fi
 
 #-----------------------------------------------------------------------
 if [ "$INSTALL_HOST_PKGS" = yes ]; then
