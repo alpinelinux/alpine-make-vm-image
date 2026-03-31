@@ -228,7 +228,7 @@ create_gpt() {
 			'label: gpt' \
 			'name=efi,type=U,size=128M,bootable' \
 			'name=system,type=L' \
-			| sfdisk "$disk_dev" ;;
+			| sfdisk "$dev" ;;
 		*) die "Invalid mode: $mode" ;;
 	esac
 }
