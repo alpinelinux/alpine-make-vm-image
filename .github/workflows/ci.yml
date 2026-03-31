@@ -13,7 +13,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install qemu-utils
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build image for x86_64 with BIOS mode and without GPT
         run: |
@@ -75,7 +75,7 @@ jobs:
     name: Test on Alpine
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       # We must run this outside the chroot.
       - run: sudo modprobe nbd max_part=16
