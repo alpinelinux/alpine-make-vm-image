@@ -377,7 +377,7 @@ umount_recursively() {
 		| cut -d ' ' -f 2 \
 		| grep "^$mount_point" \
 		| sort -r \
-		| xargs umount -rn
+		| xargs -r -n 1 umount
 }
 
 # Downloads the specified file using wget and checks checksum.
