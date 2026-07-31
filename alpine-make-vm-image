@@ -115,7 +115,7 @@ set -eu
 PATH="$PATH:/usr/sbin:/usr/bin:/sbin:/bin"
 
 readonly PROGNAME='alpine-make-vm-image'
-readonly VERSION='0.13.3'
+readonly VERSION='0.13.4'
 readonly VIRTUAL_PKG=".make-$PROGNAME"
 # An opaque string used to detect changes in resolv.conf.
 readonly RESOLVCONF_MARK="### created by $PROGNAME ###"
@@ -228,7 +228,7 @@ create_gpt() {
 			'label: gpt' \
 			'name=efi,type=U,size=128M,bootable' \
 			'name=system,type=L' \
-			| sfdisk "$disk_dev" ;;
+			| sfdisk "$dev" ;;
 		*) die "Invalid mode: $mode" ;;
 	esac
 }
@@ -381,7 +381,7 @@ umount_recursively() {
 		| cut -d ' ' -f 2 \
 		| grep "^$mount_point" \
 		| sort -r \
-		| xargs umount -rn
+		| xargs -r -n 1 umount
 }
 
 # Downloads the specified file using wget and checks checksum.
@@ -486,7 +486,10 @@ IMAGE_FILE="$1"; shift
 SCRIPT=
 [ $# -eq 0 ] || { SCRIPT=$(realpath "$1"); shift; }
 
-[ "$CLEANUP" = no ] || trap cleanup EXIT HUP INT TERM
+if [ "$CLEANUP" != 'no' ]; then
+	trap 'cleanup' EXIT
+	trap 'cleanup; exit 130' HUP INT TERM
+fi
 
 #-----------------------------------------------------------------------
 if [ "$INSTALL_HOST_PKGS" = yes ]; then
