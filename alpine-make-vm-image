@@ -36,6 +36,14 @@
 #   -B --boot-mode BOOT_MODE              Either "BIOS" (default on x86/x86_64) or "UEFI" (default
 #                                         on others). "BIOS" is supported only on x86/x86_64.
 #
+#   -L --bootloader BOOTLOADER            Bootloader for BIOS boot mode: "extlinux" (default) or
+#                                         "grub". "grub" requires --partition and adds a 1 MiB BIOS
+#                                         boot partition (p1) for GRUB's core image, before the
+#                                         root partition (p2). extlinux finds ldlinux.sys by its
+#                                         block address, so a file-level copy of the root
+#                                         filesystem (as some cloud snapshot/restore does) leaves
+#                                         it unbootable ("Boot error"); GRUB reads files by path.
+#
 #   -b --branch ALPINE_BRANCH             Alpine branch to install; used only when
 #                                         --repositories-file is not specified. Default is
 #                                         latest-stable.
@@ -214,17 +222,27 @@ blk_uuid() {
 	blkid "$dev" | sed -En 's/.*\bUUID="([^"]+)".*/\1/p'
 }
 
-# Creates GPT parition table on the device $1 for boot mode $2 (BIOS or UEFI).
+# Creates GPT parition table on the device $1 for boot mode $2 (BIOS or UEFI)
+# and bootloader $3 (extlinux or grub; BIOS only).
 create_gpt() {
 	local dev="$1"
 	local mode="$2"
+	local bootloader="$3"
 
-	case "$mode" in
-		BIOS) printf '%s\n' \
+	case "$mode/$bootloader" in
+		# GRUB embeds its core image in a BIOS boot partition (no filesystem),
+		# so it never depends on where files sit inside the root filesystem.
+		# Root stays last so it can be grown in place (cloud-init growpart).
+		BIOS/grub) printf '%s\n' \
+			'label: gpt' \
+			'name=bios_boot,type=21686148-6449-6E6F-744E-656564454649,size=1M' \
+			'name=system,type=L' \
+			| sfdisk "$dev" ;;
+		BIOS/*) printf '%s\n' \
 			'label: gpt' \
 			'name=system,type=L,bootable,attrs=LegacyBIOSBootable' \
 			| sfdisk "$dev" ;;
-		UEFI) printf '%s\n' \
+		UEFI/*) printf '%s\n' \
 			'label: gpt' \
 			'name=efi,type=U,size=128M,bootable' \
 			'name=system,type=L' \
@@ -357,6 +375,39 @@ setup_extlinux() {
 		| { grep -Fv 'extlinux: cannot open device /dev' ||:; } >&2
 }
 
+# Installs and configures GRUB for BIOS boot. Run after the kernel and mkinitfs
+# are installed; prepare_chroot must have bound /dev, /proc and /sys.
+setup_grub() {
+	local mnt="$1"  # path of directory where is root device currently mounted
+	local disk_dev="$2"  # whole disk to install GRUB's boot code on
+	local rootfs="$3"  # root filesystem type (also loaded as a module)
+	local serial_port="$4"  # serial port name for serial console, or empty
+
+	# grub-mkconfig adds root=UUID=... itself (Alpine patches it to do so even
+	# without /dev/disk/by-uuid). These are what setup_extlinux would pass.
+	local cmdline="modules=$rootfs rootfstype=$rootfs"
+	if [ "$serial_port" ]; then
+		# The last console= becomes /dev/console, so OpenRC output goes to the
+		# serial port while kernel messages also reach the VGA console.
+		cmdline="$cmdline console=tty0 console=$serial_port,115200"
+	fi
+
+	# Alpine's grub package installs /etc/default/grub; append our settings.
+	cat >> "$mnt"/etc/default/grub <<-EOF
+		GRUB_CMDLINE_LINUX_DEFAULT="$cmdline"
+		GRUB_DISABLE_OS_PROBER=true
+	EOF
+	if [ "$serial_port" ]; then
+		cat >> "$mnt"/etc/default/grub <<-EOF
+			GRUB_TERMINAL="serial console"
+			GRUB_SERIAL_COMMAND="serial --unit=${serial_port#ttyS} --speed=115200"
+		EOF
+	fi
+
+	chroot "$mnt" grub-install --target=i386-pc --boot-directory=/boot "$disk_dev"
+	chroot "$mnt" grub-mkconfig -o /boot/grub/grub.cfg
+}
+
 # Configures mkinitfs.
 setup_mkinitfs() {
 	local mnt="$1"  # path of directory where is root device currently mounted
@@ -394,8 +445,8 @@ wgets() (
 
 #=============================  M a i n  ==============================#
 
-opts=$(getopt -n $PROGNAME -o a:b:B:cCf:hi:k:m:p:Pr:s:S:tV \
-	-l arch:,boot-mode:,branch:,fs-skel-chown:,fs-skel-dir:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,partition,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
+opts=$(getopt -n $PROGNAME -o a:b:B:cCf:hi:k:L:m:p:Pr:s:S:tV \
+	-l arch:,boot-mode:,bootloader:,branch:,fs-skel-chown:,fs-skel-dir:,image-format:,image-size:,initfs-features:,kernel-flavor:,keys-dir:,mirror-uri:,no-cleanup,packages:,partition,repositories-file:,rootfs:,script-chroot,serial-console,help,version \
 	-- "$@") || help 1 >&2
 
 eval set -- "$opts"
@@ -404,6 +455,7 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 		-a | --arch) ARCH="$2";;
 		-B | --boot-mode) BOOT_MODE="$2";;
+		-L | --bootloader) BOOTLOADER="$2";;
 		-b | --branch) ALPINE_BRANCH="$2";;
 		-S | --fs-skel-dir) FS_SKEL_DIR="$(realpath "$2")";;
 		     --fs-skel-chown) FS_SKEL_CHOWN="$2";;
@@ -430,6 +482,7 @@ done
 : ${ALPINE_BRANCH:="latest-stable"}
 : ${ALPINE_MIRROR:="http://dl-cdn.alpinelinux.org/alpine"}
 : ${ARCH:=}
+: ${BOOTLOADER:="extlinux"}
 : ${CLEANUP:="yes"}
 : ${FS_SKEL_CHOWN:=}
 : ${FS_SKEL_DIR:=}
@@ -465,6 +518,13 @@ esac
 case "$BOOT_MODE" in
 	BIOS | UEFI) ;;
 	*) die "Invalid boot-mode: $BOOT_MODE";;
+esac
+
+case "$BOOTLOADER" in
+	extlinux) ;;
+	grub) [ "$BOOT_MODE" = 'BIOS' ] || die '--bootloader grub is supported only with --boot-mode BIOS'
+	      [ "$PARTITION" = 'yes' ] || die '--bootloader grub requires --partition';;
+	*) die "Invalid bootloader: $BOOTLOADER";;
 esac
 
 if [ -f /etc/alpine-release ]; then
@@ -533,9 +593,11 @@ fi
 if [ "$PARTITION" = yes ] || [ "$BOOT_MODE" = 'UEFI' ]; then
 	einfo 'Creating GPT partition table'
 
-	create_gpt "$disk_dev" "$BOOT_MODE"
+	create_gpt "$disk_dev" "$BOOT_MODE" "$BOOTLOADER"
 
-	if [ "$BOOT_MODE" = 'BIOS' ]; then
+	if [ "$BOOT_MODE" = 'BIOS' ] && [ "$BOOTLOADER" = 'grub' ]; then
+		root_dev="${disk_dev}p2"  # p1 is the BIOS boot partition
+	elif [ "$BOOT_MODE" = 'BIOS' ]; then
 		root_dev="${disk_dev}p1"
 	else
 		esp_dev="${disk_dev}p1"
@@ -626,7 +688,15 @@ _apk add --root . mkinitfs
 setup_mkinitfs . "base $ROOTFS $INITFS_FEATURES"
 
 #-----------------------------------------------------------------------
-if [ "$BOOT_MODE" = 'BIOS' ]; then
+if [ "$BOOT_MODE" = 'BIOS' ] && [ "$BOOTLOADER" = 'grub' ]; then
+	einfo 'Setting up GRUB bootloader'
+
+	# --no-scripts as for syslinux below: setup_grub writes grub.cfg once
+	# /etc/default/grub is configured. The package's /boot trigger still
+	# regenerates it on later kernel upgrades.
+	_apk add --root . --no-scripts grub grub-bios
+	setup_grub . "$disk_dev" "$ROOTFS" "$SERIAL_PORT"
+elif [ "$BOOT_MODE" = 'BIOS' ]; then
 	einfo 'Setting up extlinux bootloader'
 
 	_apk add --root . --no-scripts syslinux
