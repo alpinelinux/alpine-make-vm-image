@@ -156,6 +156,10 @@ einfo() {
 	printf '\n\033[1;36m> %s\033[0m\n' "$@" >&2  # bold cyan
 }
 
+ewarn() {
+	printf '\033[1;33mWARNING:\033[0m %s\n' "$@" >&2  # bold yellow
+}
+
 # Prints help and exists with the specified status.
 help() {
 	sed -En '/^#---help---/,/^#---help---/p' "$0" | sed -E 's/^# ?//; 1d;$d;'
@@ -311,6 +315,11 @@ rc_add() {
 settle_dev_node() {
 	local dev="$1"
 
+	# Let udev finish first even if the node already exists: right after
+	# partitioning it may be re-reading the partition table, which removes
+	# and recreates the partition nodes (see run_mkfs).
+	! has_cmd udevadm || udevadm settle || true
+
 	[ -e "$dev" ] && return 0
 
 	sleep 1  # give hotplug handler some time to kick in
@@ -324,6 +333,27 @@ settle_dev_node() {
 	[ -e "$dev" ] && return 0
 
 	return 1
+}
+
+# Runs mkfs ("$@", device last), retrying while the device node is missing.
+# When sfdisk closes the disk after writing, udev re-reads its partition table,
+# briefly removing and recreating the partition nodes, so a node that
+# settle_dev_node saw can be gone a moment later ("The file /dev/nbd15p2 does
+# not exist"; CI run 42983591331). Once mkfs has the device open the kernel
+# refuses that re-read (EBUSY), so only the open can lose the race. Any other
+# failure, with the node present, is returned at once.
+run_mkfs() {
+	local dev; eval "dev=\${$#}"
+	local try=1
+
+	while ! "$@"; do
+		[ -b "$dev" ] && return 1
+		[ $try -lt 10 ] || return 1
+		ewarn "$dev disappeared (partition table re-read?), retrying mkfs ($try)"
+		try=$((try + 1))
+		sleep 1
+		settle_dev_node "$dev" || true
+	done
 }
 
 # Installs and configures extlinux.
@@ -551,7 +581,7 @@ fi
 einfo 'Creating filesystem(s)'
 
 if [ "$BOOT_MODE" = 'UEFI' ]; then
-	mkfs.fat -F32 -n EFI "$esp_dev"
+	run_mkfs mkfs.fat -F32 -n EFI "$esp_dev"
 fi
 
 # syslinux 6.0.3 cannot boot from ext4 w/ 64bit feature enabled.
@@ -559,7 +589,7 @@ fi
 # useless for NBD image and prints confusing error).
 [ "$ROOTFS" = ext4 ] && mkfs_args='-O ^64bit -E nodiscard' || mkfs_args='-K'
 
-mkfs.$ROOTFS -L root $mkfs_args "$root_dev"
+run_mkfs mkfs.$ROOTFS -L root $mkfs_args "$root_dev"
 
 root_uuid=$(blk_uuid "$root_dev")
 mount_dir=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
