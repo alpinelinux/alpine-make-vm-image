@@ -40,6 +40,20 @@ jobs:
               --script-chroot \
               alpine-bios-part-$(date +%Y-%m-%d).raw -- ./example/configure.sh
 
+      - name: Build image for x86_64 with BIOS mode, GPT and GRUB
+        run: |
+          sudo ./alpine-make-vm-image \
+              --image-format raw \
+              --image-size 2G \
+              --partition \
+              --bootloader grub \
+              --repositories-file example/repositories \
+              --packages "$(cat example/packages)" \
+              --fs-skel-dir example/rootfs \
+              --fs-skel-chown root:root \
+              --script-chroot \
+              alpine-bios-grub-$(date +%Y-%m-%d).raw -- ./example/configure.sh
+
       - name: Build image for x86_64 with UEFI mode
         run: |
           sudo ./alpine-make-vm-image \
