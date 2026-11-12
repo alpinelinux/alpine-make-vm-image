@@ -54,7 +54,11 @@ jobs:
               alpine-uefi-$(date +%Y-%m-%d).qcow2 -- ./example/configure.sh
 
       - name: Install qemu-aarch64 and register in binfmt
-        uses: jirutka/setup-alpine@v1
+        # rjstone/setup-alpine is a fork of jirutka/setup-alpine with the sudo-rs
+        # fix (ubuntu-latest is Ubuntu 26.04, whose sudo ignores `sudo -E`); see
+        # jirutka/setup-alpine#35. Switch back to jirutka/setup-alpine@v1 once
+        # that fix is released there.
+        uses: rjstone/setup-alpine@v1
         with:
           arch: aarch64
 
@@ -81,7 +85,11 @@ jobs:
       - run: sudo modprobe nbd max_part=16
 
       - name: Set up Alpine Linux v3.22
-        uses: jirutka/setup-alpine@v1
+        # rjstone/setup-alpine is a fork of jirutka/setup-alpine with the sudo-rs
+        # fix (ubuntu-latest is Ubuntu 26.04, whose sudo ignores `sudo -E`); see
+        # jirutka/setup-alpine#35. Switch back to jirutka/setup-alpine@v1 once
+        # that fix is released there.
+        uses: rjstone/setup-alpine@v1
         with:
           # XXX: v3.23 doesn't work here, running package triggers results in "unshare: Invalid argument"
           branch: v3.22
@@ -114,7 +122,11 @@ jobs:
         shell: alpine.sh --root {0}
 
       - name: Install qemu-aarch64 and register in binfmt
-        uses: jirutka/setup-alpine@v1
+        # rjstone/setup-alpine is a fork of jirutka/setup-alpine with the sudo-rs
+        # fix (ubuntu-latest is Ubuntu 26.04, whose sudo ignores `sudo -E`); see
+        # jirutka/setup-alpine#35. Switch back to jirutka/setup-alpine@v1 once
+        # that fix is released there.
+        uses: rjstone/setup-alpine@v1
         with:
           arch: aarch64
           shell-name: alpine-aarch64.sh
